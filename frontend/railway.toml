@@ -1,11 +1,7 @@
-# railway.toml — tells Railway how to build and serve the frontend
-# Place this in the /frontend directory
-
 [build]
 builder = "nixpacks"
 buildCommand = "npm install && npm run build"
 
 [deploy]
-startCommand = "npx serve dist -l $PORT"
 healthcheckPath = "/"
 healthcheckTimeout = 30
