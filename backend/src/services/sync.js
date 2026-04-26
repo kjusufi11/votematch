@@ -1,13 +1,12 @@
 // src/services/sync.js
-// Syncs politicians and their votes from ProPublica into our database.
-// Run manually or via a cron job (e.g. nightly at 2am).
+// Syncs politicians and votes from congress.gov into our database
 
-const propublica = require('./propublica');
+const congress = require('./congress');
 const db = require('../db');
 
-const CURRENT_CONGRESS = 119; // Update each new Congress
+const CURRENT_CONGRESS = congress.CURRENT_CONGRESS;
 
-// ── Sync members ──────────────────────────────────────────────────────────────
+// ── Sync all members of a chamber ────────────────────────────────────────────
 
 async function syncMembers(chamber = 'both') {
   const chambers = chamber === 'both' ? ['senate', 'house'] : [chamber];
@@ -15,70 +14,72 @@ async function syncMembers(chamber = 'both') {
 
   for (const ch of chambers) {
     console.log(`  Syncing ${ch} members...`);
-    const [result] = await propublica.getMembers(CURRENT_CONGRESS, ch);
-    if (!result?.members) continue;
-
-    for (const member of result.members) {
-      const normalized = propublica.normalizeMember(member, ch);
-      await db.query(`
-        INSERT INTO politicians (
-          id, full_name, first_name, last_name, party, state, chamber, district,
-          title, in_office, dw_nominate, next_election, twitter_handle, url,
-          total_votes, missed_votes_pct, party_loyalty_pct, last_synced
-        ) VALUES (
-          $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,NOW()
-        )
-        ON CONFLICT (id) DO UPDATE SET
-          full_name=$2, party=$5, in_office=$10, dw_nominate=$11,
-          total_votes=$15, missed_votes_pct=$16, party_loyalty_pct=$17,
-          last_synced=NOW()
-      `, [
-        normalized.id, normalized.full_name, normalized.first_name, normalized.last_name,
-        normalized.party, normalized.state, normalized.chamber, normalized.district,
-        normalized.title, normalized.in_office, normalized.dw_nominate,
-        normalized.next_election, normalized.twitter_handle, normalized.url,
-        normalized.total_votes, normalized.missed_votes_pct, normalized.party_loyalty_pct,
-      ]);
-      total++;
+    try {
+      const members = await congress.getMembers(CURRENT_CONGRESS, ch);
+      for (const m of members) {
+        const normalized = congress.normalizeMember(m);
+        await upsertMember(normalized);
+        total++;
+      }
+      console.log(`    ✓ Synced ${members.length} ${ch} members`);
+    } catch (err) {
+      console.warn(`  Failed to sync ${ch}:`, err.message);
     }
-    console.log(`    ✓ Synced ${result.members.length} ${ch} members`);
+  }
+  return total;
+}
+
+// ── Sync a single member's profile ───────────────────────────────────────────
+
+async function syncSingleMember(bioguideId) {
+  // Skip if recently synced
+  const existing = await db.query('SELECT last_synced FROM politicians WHERE id = $1', [bioguideId]);
+  const lastSynced = existing.rows[0]?.last_synced;
+  if (lastSynced && (Date.now() - new Date(lastSynced)) < 24 * 3600 * 1000) return;
+
+  try {
+    const member = await congress.getMember(bioguideId);
+    if (!member) return;
+    const normalized = congress.normalizeMember(member);
+    await upsertMember(normalized);
+  } catch (err) {
+    console.warn(`Could not sync member ${bioguideId}:`, err.message);
   }
 
-  return total;
+  // Sync their votes
+  try {
+    await syncVotesForPolitician(bioguideId, 0);
+  } catch (err) {
+    console.warn(`Could not sync votes for ${bioguideId}:`, err.message);
+  }
 }
 
 // ── Sync votes for a politician ───────────────────────────────────────────────
 
-async function syncVotesForPolitician(politicianId, pages = 3) {
-  let totalSynced = 0;
+async function syncVotesForPolitician(bioguideId, offset = 0) {
+  let synced = 0;
+  try {
+    const votes = await congress.getMemberVotes(bioguideId, offset);
+    for (const vote of votes) {
+      const normalized = congress.normalizeVote(vote, bioguideId);
 
-  for (let page = 0; page < pages; page++) {
-    const offset = page * 20;
-    const [result] = await propublica.getMemberVotes(politicianId, offset);
-    if (!result?.votes?.length) break;
-
-    for (const vote of result.votes) {
-      // Upsert bill if we have bill info
+      // Upsert bill if available
       let billId = null;
-      if (vote.bill?.bill_id) {
-        billId = `${vote.bill.bill_id}-${CURRENT_CONGRESS}`;
+      if (vote.bill?.number && vote.bill?.type) {
+        billId = `${vote.bill.type.toLowerCase()}${vote.bill.number}-${vote.congress || CURRENT_CONGRESS}`;
         await db.query(`
-          INSERT INTO bills (id, bill_id, number, title, short_title, primary_subject, congress)
-          VALUES ($1, $2, $3, $4, $5, $6, $7)
+          INSERT INTO bills (id, number, title, primary_subject, congress)
+          VALUES ($1, $2, $3, $4, $5)
           ON CONFLICT (id) DO NOTHING
         `, [
           billId,
-          vote.bill.bill_id,
-          vote.bill.number || null,
-          vote.description || vote.question,
-          vote.bill.title || null,
-          vote.bill.primary_subject || null,
-          CURRENT_CONGRESS,
-        ]);
+          vote.bill.number,
+          vote.description || vote.question || 'Unknown',
+          vote.subject || null,
+          vote.congress || CURRENT_CONGRESS,
+        ]).catch(() => {});
       }
 
-      // Upsert vote
-      const normalized = propublica.normalizeVote(vote, politicianId);
       await db.query(`
         INSERT INTO votes (politician_id, bill_id, vote_id, position, question, description, vote_date, session, congress)
         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
@@ -87,42 +88,42 @@ async function syncVotesForPolitician(politicianId, pages = 3) {
         normalized.politician_id, billId, normalized.vote_id,
         normalized.position, normalized.question, normalized.description,
         normalized.vote_date, normalized.session, normalized.congress,
-      ]);
-      totalSynced++;
+      ]).catch(() => {});
+
+      synced++;
     }
-
-    // Rate limit: ProPublica allows ~1 req/sec on free tier
-    if (page < pages - 1) await sleep(1100);
+  } catch (err) {
+    console.warn(`Vote sync error for ${bioguideId}:`, err.message);
   }
-
-  return totalSynced;
+  return synced;
 }
 
 // ── Sync representatives for a user's location ───────────────────────────────
-// Called when a user first looks up their ZIP — ensures those specific
-// politicians are in our DB with fresh vote data
 
 async function syncRepresentatives(state, district) {
   const synced = [];
 
-  // Always sync both senators
+  // Sync senators for this state
   try {
-    const senators = await propublica.getSenatorsByState(state);
-    for (const senator of senators || []) {
-      await syncSingleMember(senator.id || senator, 'senate');
-      synced.push(senator.id || senator);
+    const senators = await congress.getMembersByState(state, 'senate');
+    for (const s of senators) {
+      if (s.bioguideId) {
+        await syncSingleMember(s.bioguideId);
+        synced.push(s.bioguideId);
+      }
     }
   } catch (err) {
     console.warn(`Could not sync senators for ${state}:`, err.message);
   }
 
-  // Sync the House rep for this district
+  // Sync house rep for this district
   if (district) {
     try {
-      const reps = await propublica.getRepByDistrict(state, district);
-      for (const rep of reps || []) {
-        await syncSingleMember(rep.id || rep, 'house');
-        synced.push(rep.id || rep);
+      const reps = await congress.getMembersByState(state, 'house');
+      const districtRep = reps.find(r => r.district == district);
+      if (districtRep?.bioguideId) {
+        await syncSingleMember(districtRep.bioguideId);
+        synced.push(districtRep.bioguideId);
       }
     } catch (err) {
       console.warn(`Could not sync rep for ${state}-${district}:`, err.message);
@@ -132,61 +133,32 @@ async function syncRepresentatives(state, district) {
   return synced;
 }
 
-async function syncSingleMember(bioguideId, chamber) {
-  // Check if already recently synced
-  const existing = await db.query(
-    'SELECT last_synced FROM politicians WHERE id = $1',
-    [bioguideId]
-  );
+// ── Upsert member to DB ───────────────────────────────────────────────────────
 
-  const lastSynced = existing.rows[0]?.last_synced;
-  const staleHours = 24;
-  if (lastSynced && (Date.now() - new Date(lastSynced)) < staleHours * 3600 * 1000) {
-    return; // Fresh enough
-  }
-
-  // Sync member profile
-  try {
-    const member = await propublica.getMember(bioguideId);
-    if (!member) return;
-
-    const normalized = propublica.normalizeMember(member, chamber || member.roles?.[0]?.chamber || 'house');
-    await db.query(`
-      INSERT INTO politicians (
-        id, full_name, first_name, last_name, party, state, chamber, district,
-        title, in_office, dw_nominate, next_election, twitter_handle, url,
-        total_votes, missed_votes_pct, party_loyalty_pct, last_synced
-      ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,NOW())
-      ON CONFLICT (id) DO UPDATE SET
-        full_name=$2, party=$5, in_office=$10, dw_nominate=$11,
-        total_votes=$15, missed_votes_pct=$16, party_loyalty_pct=$17, last_synced=NOW()
-    `, [
-      normalized.id, normalized.full_name, normalized.first_name, normalized.last_name,
-      normalized.party, normalized.state, normalized.chamber, normalized.district,
-      normalized.title, normalized.in_office, normalized.dw_nominate,
-      normalized.next_election, normalized.twitter_handle, normalized.url,
-      normalized.total_votes, normalized.missed_votes_pct, normalized.party_loyalty_pct,
-    ]);
-  } catch (err) {
-    console.warn(`Could not sync member profile ${bioguideId}:`, err.message);
-  }
-
-  // Sync their recent votes (last 3 pages = ~60 votes)
-  try {
-    await syncVotesForPolitician(bioguideId, 3);
-  } catch (err) {
-    console.warn(`Could not sync votes for ${bioguideId}:`, err.message);
-  }
+async function upsertMember(m) {
+  await db.query(`
+    INSERT INTO politicians (
+      id, full_name, first_name, last_name, party, state, chamber, district,
+      title, in_office, url, total_votes, missed_votes_pct, party_loyalty_pct, last_synced
+    ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,NOW())
+    ON CONFLICT (id) DO UPDATE SET
+      full_name=$2, party=$5, in_office=$10, url=$11,
+      total_votes=$12, missed_votes_pct=$13, party_loyalty_pct=$14,
+      last_synced=NOW()
+  `, [
+    m.id, m.full_name, m.first_name, m.last_name,
+    m.party, m.state, m.chamber, m.district,
+    m.title, m.in_office, m.url,
+    m.total_votes || 0, m.missed_votes_pct || 0, m.party_loyalty_pct || 0,
+  ]);
 }
 
-function sleep(ms) {
-  return new Promise(resolve => setTimeout(resolve, ms));
-}
+function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
 
 module.exports = {
   syncMembers,
+  syncSingleMember,
   syncVotesForPolitician,
   syncRepresentatives,
-  syncSingleMember,
   CURRENT_CONGRESS,
 };
