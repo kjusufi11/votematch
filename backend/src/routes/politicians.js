@@ -7,6 +7,50 @@ const biasEngine = require('../services/biasEngine');
 const sync = require('../services/sync');
 const mockData = require('../services/mockData');
 
+// GET /api/politicians/debug/count — must be BEFORE /:id route
+router.get('/debug/count', async (req, res) => {
+  try {
+    const total  = await db.query('SELECT COUNT(*) FROM politicians');
+    const ny     = await db.query("SELECT COUNT(*) FROM politicians WHERE state = 'NY'");
+    const senate = await db.query("SELECT COUNT(*) FROM politicians WHERE chamber = 'senate'");
+    const active = await db.query("SELECT COUNT(*) FROM politicians WHERE in_office = true");
+    const sample = await db.query('SELECT id, full_name, state, chamber, in_office FROM politicians LIMIT 5');
+    res.json({
+      total:        total.rows[0].count,
+      ny_count:     ny.rows[0].count,
+      senate_count: senate.rows[0].count,
+      active_count: active.rows[0].count,
+      sample:       sample.rows,
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message, stack: err.stack });
+  }
+});
+
+// GET /api/politicians?state=NY&chamber=senate
+router.get('/', async (req, res) => {
+  const { q, state, chamber, party } = req.query;
+  try {
+    const conditions = ['p.in_office = true'];
+    const params = [];
+    if (q)       { params.push(`%${q}%`);            conditions.push(`p.full_name ILIKE $${params.length}`); }
+    if (state)   { params.push(state.toUpperCase());  conditions.push(`p.state = $${params.length}`); }
+    if (chamber) { params.push(chamber.toLowerCase()); conditions.push(`p.chamber = $${params.length}`); }
+    if (party)   { params.push(party.toUpperCase());  conditions.push(`p.party = $${params.length}`); }
+
+    const result = await db.query(`
+      SELECT id, full_name, party, state, chamber, district, title, total_votes, party_loyalty_pct
+      FROM politicians p
+      WHERE ${conditions.join(' AND ')}
+      ORDER BY last_name LIMIT 50
+    `, params);
+    res.json(result.rows);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // GET /api/politicians/:id
 router.get('/:id', async (req, res) => {
   const { id } = req.params;
@@ -18,7 +62,6 @@ router.get('/:id', async (req, res) => {
   }
 
   try {
-    // If not in DB yet, sync them first
     const existing = await db.query('SELECT id FROM politicians WHERE id = $1', [id]);
     if (!existing.rows.length) {
       console.log(`[sync] ${id} not in DB — syncing now...`);
@@ -28,13 +71,11 @@ router.get('/:id', async (req, res) => {
     const result = await db.query(`
       SELECT p.*,
         COALESCE(
-          json_agg(
-            json_build_object(
-              'category', bs.category, 'label', bs.label, 'score', bs.score,
-              'direction', bs.direction, 'confidence', bs.confidence,
-              'vote_count', bs.vote_count, 'summary', bs.summary
-            ) ORDER BY bs.score DESC
-          ) FILTER (WHERE bs.category IS NOT NULL), '[]'
+          json_agg(json_build_object(
+            'category', bs.category, 'label', bs.label, 'score', bs.score,
+            'direction', bs.direction, 'confidence', bs.confidence,
+            'vote_count', bs.vote_count, 'summary', bs.summary
+          ) ORDER BY bs.score DESC) FILTER (WHERE bs.category IS NOT NULL), '[]'
         ) as bias_scores
       FROM politicians p
       LEFT JOIN bias_scores bs ON bs.politician_id = p.id
@@ -50,10 +91,10 @@ router.get('/:id', async (req, res) => {
   }
 });
 
-// GET /api/politicians/:id/votes?page=0
+// GET /api/politicians/:id/votes
 router.get('/:id/votes', async (req, res) => {
   const { id } = req.params;
-  const page = parseInt(req.query.page || 0);
+  const page  = parseInt(req.query.page || 0);
   const limit = 25;
   const offset = page * limit;
 
@@ -62,10 +103,8 @@ router.get('/:id/votes', async (req, res) => {
   }
 
   try {
-    // Auto-sync if no votes exist yet
     const count = await db.query('SELECT COUNT(*) FROM votes WHERE politician_id = $1', [id]);
     if (parseInt(count.rows[0].count) === 0) {
-      console.log(`[sync] No votes for ${id} — syncing now...`);
       await sync.syncSingleMember(id);
     }
 
@@ -97,7 +136,6 @@ router.get('/:id/votes', async (req, res) => {
 router.post('/:id/analyze', async (req, res) => {
   const { id } = req.params;
   const forceRefresh = req.query.refresh === 'true';
-
   try {
     const voteCount = await db.query('SELECT COUNT(*) FROM votes WHERE politician_id = $1', [id]);
     if (parseInt(voteCount.rows[0].count) < 10) {
@@ -126,30 +164,7 @@ router.get('/:id/analysis', async (req, res) => {
   }
 });
 
-// GET /api/politicians?state=NY&chamber=senate
-router.get('/', async (req, res) => {
-  const { q, state, chamber, party } = req.query;
-  try {
-    const conditions = ['p.in_office = true'];
-    const params = [];
-    if (q) { params.push(`%${q}%`); conditions.push(`p.full_name ILIKE $${params.length}`); }
-    if (state) { params.push(state.toUpperCase()); conditions.push(`p.state = $${params.length}`); }
-    if (chamber) { params.push(chamber.toLowerCase()); conditions.push(`p.chamber = $${params.length}`); }
-    if (party) { params.push(party.toUpperCase()); conditions.push(`p.party = $${params.length}`); }
-
-    const result = await db.query(`
-      SELECT id, full_name, party, state, chamber, district, title, total_votes, party_loyalty_pct
-      FROM politicians p
-      WHERE ${conditions.join(' AND ')}
-      ORDER BY last_name LIMIT 50
-    `, params);
-    res.json(result.rows);
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
-// POST /api/politicians/:id/sync — force a fresh sync
+// POST /api/politicians/:id/sync
 router.post('/:id/sync', async (req, res) => {
   const { id } = req.params;
   try {
@@ -162,21 +177,3 @@ router.post('/:id/sync', async (req, res) => {
 });
 
 module.exports = router;
-
-// GET /api/politicians/debug/count — raw DB check
-router.get('/debug/count', async (req, res) => {
-  try {
-    const total = await db.query('SELECT COUNT(*) FROM politicians');
-    const ny = await db.query("SELECT COUNT(*) FROM politicians WHERE state = 'NY'");
-    const senate = await db.query("SELECT COUNT(*) FROM politicians WHERE chamber = 'senate'");
-    const sample = await db.query('SELECT id, full_name, state, chamber, in_office FROM politicians LIMIT 3');
-    res.json({
-      total: total.rows[0].count,
-      ny_count: ny.rows[0].count,
-      senate_count: senate.rows[0].count,
-      sample: sample.rows,
-    });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
