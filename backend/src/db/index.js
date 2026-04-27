@@ -1,13 +1,10 @@
 // src/db/index.js
-// Shared PostgreSQL connection pool
-// In mock mode (no real API keys), DB calls are silently skipped.
-
 const { Pool } = require('pg');
 
-const isMock = !process.env.DATABASE_URL ||
-  process.env.MOCK_MODE === 'true' ||
-  !process.env.PROPUBLICA_API_KEY ||
-  process.env.PROPUBLICA_API_KEY === 'your_propublica_key_here';
+// Only use mock/noop if explicitly set OR no database URL at all
+const isMock = process.env.MOCK_MODE === 'true' ||
+  !process.env.DATABASE_URL ||
+  process.env.DATABASE_URL === 'postgresql://localhost:5432/votemap';
 
 let pool = null;
 
@@ -16,14 +13,17 @@ if (!isMock) {
     connectionString: process.env.DATABASE_URL,
     max: 10,
     idleTimeoutMillis: 30000,
-    connectionTimeoutMillis: 2000,
+    connectionTimeoutMillis: 5000,
+    ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false,
   });
   pool.on('error', (err) => {
-    console.error('Unexpected DB pool error:', err.message);
+    console.error('DB pool error:', err.message);
   });
+  console.log('DB: Connected to PostgreSQL');
+} else {
+  console.log('DB: Mock mode — no database connection');
 }
 
-// Stub query that returns empty results in mock mode
 const noopQuery = async () => ({ rows: [], rowCount: 0 });
 
 module.exports = {
