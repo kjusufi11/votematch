@@ -23,7 +23,10 @@ export default function RepresentativeCard({ rep, index }) {
     try {
       const result = await triggerAnalysis(profile.id);
       if (result.analysis) { setAnalysis(result.analysis); setBiases(result.analysis.biases || []); }
-    } catch (err) { setError(err?.response?.data?.error || 'Analysis failed.'); }
+    } catch (err) { 
+      const msg = err?.response?.data?.error || err?.message || 'Analysis failed. Please try again.';
+      setError(typeof msg === 'string' ? msg.slice(0, 120) : 'Analysis failed. Please try again.');
+    }
     finally { setAnalyzing(false); }
   }
 
