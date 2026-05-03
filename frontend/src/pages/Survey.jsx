@@ -142,6 +142,11 @@ export default function Survey() {
         if (existing?.answers) {
           setAnswers(existing.answers);
           setImportance(existing.importance || {});
+          // If all questions answered, show completion screen
+          const answeredCount = Object.keys(existing.answers).length;
+          if (answeredCount >= ISSUES.length) {
+            setStep(ISSUES.length + 1);
+          }
         }
       } catch {}
       setLoading(false);
@@ -218,36 +223,71 @@ export default function Survey() {
     );
   }
 
-  // Done
+  // Done — show summary of answers
   if (step === totalSteps + 1) {
     return (
-      <main style={{ maxWidth: 680, margin: '0 auto', padding: '4rem 1.5rem', textAlign: 'center' }}>
-        <div style={{ fontSize: 48, marginBottom: '1.5rem' }}>✓</div>
-        <h1 style={{
-          fontFamily: 'var(--font-display)', fontSize: 'clamp(2rem, 5vw, 3rem)',
-          fontWeight: 900, letterSpacing: '-.02em', marginBottom: '1rem',
-        }}>Your values are saved.</h1>
-        <p style={{ fontSize: 16, color: 'var(--text-2)', lineHeight: 1.7, marginBottom: '1rem' }}>
-          We'll use your answers to calculate how closely each of your representatives
-          votes in line with what you believe — weighted by the issues you marked as most important.
-        </p>
-        <p style={{ fontSize: 14, color: 'var(--text-3)', lineHeight: 1.65, marginBottom: '2.5rem' }}>
-          You can update your answers anytime from the "My Values" menu.
-          Alignment scores will appear on your representatives' profiles.
-        </p>
-        <div style={{ display: 'flex', gap: 12, justifyContent: 'center', flexWrap: 'wrap' }}>
-          <button onClick={() => navigate('/reps')} style={{
-            height: 48, padding: '0 2rem',
-            background: 'var(--text)', color: 'var(--bg-2)',
-            borderRadius: 'var(--radius)', fontSize: 14, fontWeight: 500,
-            cursor: 'pointer', border: 'none',
-          }}>See my representatives →</button>
-          <button onClick={() => setStep(1)} style={{
-            height: 48, padding: '0 2rem',
-            background: 'transparent', color: 'var(--text-2)',
-            borderRadius: 'var(--radius)', fontSize: 14,
-            cursor: 'pointer', border: '1px solid var(--border-med)',
-          }}>Review my answers</button>
+      <main style={{ maxWidth: 680, margin: '0 auto', padding: '4rem 1.5rem 6rem' }}>
+        <div style={{ textAlign: 'center', marginBottom: '3rem' }}>
+          <div style={{ fontSize: 40, marginBottom: '1rem' }}>✓</div>
+          <h1 style={{
+            fontFamily: 'var(--font-display)', fontSize: 'clamp(1.8rem, 4vw, 2.75rem)',
+            fontWeight: 900, letterSpacing: '-.02em', marginBottom: '1rem',
+          }}>Your values are saved.</h1>
+          <p style={{ fontSize: 15, color: 'var(--text-2)', lineHeight: 1.7, marginBottom: '.75rem' }}>
+            We use your answers to calculate how closely each of your representatives
+            votes in line with what you believe — weighted by the issues you marked most important.
+          </p>
+          <p style={{ fontSize: 13, color: 'var(--text-3)', marginBottom: '2rem' }}>
+            Alignment scores will appear on your representatives profiles. You can update your answers anytime.
+          </p>
+          <div style={{ display: 'flex', gap: 10, justifyContent: 'center', flexWrap: 'wrap' }}>
+            <button onClick={() => navigate('/reps')} style={{
+              height: 46, padding: '0 1.75rem', background: 'var(--text)', color: 'var(--bg-2)',
+              borderRadius: 'var(--radius)', fontSize: 14, fontWeight: 500, cursor: 'pointer', border: 'none',
+            }}>See my representatives →</button>
+            <button onClick={() => setStep(1)} style={{
+              height: 46, padding: '0 1.75rem', background: 'transparent', color: 'var(--text-2)',
+              borderRadius: 'var(--radius)', fontSize: 14, cursor: 'pointer', border: '1px solid var(--border-med)',
+            }}>Update my answers</button>
+          </div>
+        </div>
+
+        <div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '1.5rem' }}>
+            <span style={{ fontSize: 10, fontFamily: 'var(--font-mono)', color: 'var(--text-3)', letterSpacing: '.12em', textTransform: 'uppercase', whiteSpace: 'nowrap' }}>Your answers</span>
+            <div style={{ flex: 1, height: 1, background: 'var(--border)' }} />
+          </div>
+          {ISSUES.map(issue => {
+            const answer = answers[issue.id];
+            const imp = importance[issue.id] || 2;
+            const selectedOption = issue.options.find(o => o.value === answer);
+            return (
+              <div key={issue.id} style={{
+                padding: '1rem 1.25rem', marginBottom: 8,
+                background: 'var(--bg-2)', border: '1px solid var(--border)',
+                borderRadius: 'var(--radius-lg)', boxShadow: 'var(--shadow)',
+              }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '1rem' }}>
+                  <div style={{ flex: 1 }}>
+                    <p style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-3)', marginBottom: 4 }}>{issue.label}</p>
+                    <p style={{ fontSize: 14, color: 'var(--text)', lineHeight: 1.5 }}>
+                      {selectedOption ? selectedOption.label : <span style={{ color: 'var(--text-3)', fontStyle: 'italic' }}>Skipped</span>}
+                    </p>
+                  </div>
+                  {selectedOption && (
+                    <span style={{
+                      fontSize: 10, fontFamily: 'var(--font-mono)', whiteSpace: 'nowrap', padding: '3px 8px',
+                      borderRadius: 20, flexShrink: 0,
+                      background: imp === 3 ? 'var(--red-dim)' : imp === 2 ? 'var(--amber-dim)' : 'var(--bg-3)',
+                      color: imp === 3 ? 'var(--red)' : imp === 2 ? 'var(--amber)' : 'var(--text-3)',
+                    }}>
+                      {imp === 3 ? 'Very important' : imp === 2 ? 'Somewhat important' : 'Not very important'}
+                    </span>
+                  )}
+                </div>
+              </div>
+            );
+          })}
         </div>
       </main>
     );
