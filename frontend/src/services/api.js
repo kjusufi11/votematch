@@ -85,3 +85,17 @@ export async function getAlignment(userId, politicianIds) {
     return {};
   }
 }
+
+export async function getAlignmentForPolitician(politicianId, userId) {
+  const base = (import.meta.env.VITE_API_URL || 'https://votemap-production.up.railway.app').replace(/\/api$/, '');
+  const token = localStorage.getItem('votemap_token');
+  try {
+    const res = await fetch(`${base}/api/politicians/${politicianId}/alignment?userId=${userId}`, {
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    });
+    if (!res.ok) return null;
+    return res.json();
+  } catch {
+    return null;
+  }
+}

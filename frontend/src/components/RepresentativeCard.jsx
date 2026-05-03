@@ -1,18 +1,34 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import BiasBar from './BiasBar';
-import { triggerAnalysis } from '../services/api';
+import { triggerAnalysis, getAlignmentForPolitician } from '../services/api';
 
 const partyColor = p => p === 'D' ? 'var(--party-d)' : p === 'R' ? 'var(--party-r)' : 'var(--party-i)';
 const partyDim   = p => p === 'D' ? 'var(--party-d-dim)' : p === 'R' ? 'var(--party-r-dim)' : 'var(--party-i-dim)';
 const partyLabel = p => p === 'D' ? 'Democrat' : p === 'R' ? 'Republican' : p === 'I' ? 'Independent' : p || '—';
 
-export default function RepresentativeCard({ rep, index, alignment }) {
-  const [analyzing, setAnalyzing] = useState(false);
-  const [analysis,  setAnalysis]  = useState(rep.profile?.aiAnalysis || null);
-  const [biases,    setBiases]    = useState(rep.profile?.biasScores || []);
-  const [error,     setError]     = useState('');
-  const [expanded,  setExpanded]  = useState(false);
+export default function RepresentativeCard({ rep, index, alignment: alignmentProp }) {
+  const [analyzing,      setAnalyzing]     = useState(false);
+  const [analysis,       setAnalysis]      = useState(rep.profile?.aiAnalysis || null);
+  const [biases,         setBiases]        = useState(rep.profile?.biasScores || []);
+  const [error,          setError]         = useState('');
+  const [expanded,       setExpanded]      = useState(false);
+  const [alignmentData,  setAlignmentData] = useState(alignmentProp || null);
+
+  useEffect(() => {
+    if (alignmentProp?.score != null) { setAlignmentData(alignmentProp); return; }
+    const id = rep.profile?.id;
+    if (!id) return;
+    const stored = localStorage.getItem('votemap_user');
+    if (!stored) return;
+    try {
+      const u = JSON.parse(stored);
+      if (!u?.id) return;
+      getAlignmentForPolitician(id, u.id)
+        .then(data => { if (data?.score != null) setAlignmentData(data); })
+        .catch(() => {});
+    } catch {}
+  }, [rep.profile?.id, alignmentProp?.score]);
 
   const profile = rep.profile;
   const party   = rep.party || profile?.party;
@@ -71,14 +87,14 @@ export default function RepresentativeCard({ rep, index, alignment }) {
                 fontSize: 11, fontFamily: 'var(--font-mono)', padding: '2px 8px', borderRadius: 3,
                 background: partyDim(party), color: partyColor(party),
               }}>{partyLabel(party)}</span>
-              {alignment && alignment.score != null && (
+              {alignmentData?.score != null && (
                 <span style={{
                   fontSize: 11, fontFamily: "var(--font-mono)", padding: "2px 10px", borderRadius: 20,
-                  background: alignment.score >= 60 ? "var(--green-dim)" : alignment.score >= 40 ? "var(--amber-dim)" : "var(--red-dim)",
-                  color: alignment.score >= 60 ? "var(--green)" : alignment.score >= 40 ? "var(--amber)" : "var(--red)",
+                  background: alignmentData.score >= 60 ? "var(--green-dim)" : alignmentData.score >= 40 ? "var(--amber-dim)" : "var(--red-dim)",
+                  color: alignmentData.score >= 60 ? "var(--green)" : alignmentData.score >= 40 ? "var(--amber)" : "var(--red)",
                   fontWeight: 500,
                 }}>
-                  {alignment.score}% match
+                  {alignmentData.score}% match
                 </span>
               )}
               
