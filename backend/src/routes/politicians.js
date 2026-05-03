@@ -262,6 +262,45 @@ router.post('/:id/analyze', async (req, res) => {
   }
 });
 
+// POST /api/politicians/sync-zero-votes?limit=N
+// Syncs votes for politicians that have total_votes=0.
+// Processes in batches; call repeatedly until remaining=0 or gotVotes=0.
+router.post('/sync-zero-votes', async (req, res) => {
+  const limit = Math.min(parseInt(req.query.limit) || 30, 50);
+  try {
+    const { rows: toSync } = await db.query(`
+      SELECT id FROM politicians
+      WHERE total_votes = 0
+      ORDER BY last_synced ASC NULLS FIRST
+      LIMIT $1
+    `, [limit]);
+
+    let processed = 0, gotVotes = 0, errors = 0;
+
+    for (const { id } of toSync) {
+      try {
+        await sync.syncVotesForPolitician(id, 0);
+        const stats = await sync.updatePoliticianStats(id);
+        if (stats.totalVotes > 0) gotVotes++;
+      } catch {
+        errors++;
+      }
+      // Always bump last_synced so this politician isn't re-picked immediately
+      await db.query('UPDATE politicians SET last_synced = NOW() WHERE id = $1', [id]).catch(() => {});
+      await new Promise(r => setTimeout(r, 150));
+      processed++;
+    }
+
+    const { rows: [{ count: remaining }] } = await db.query(
+      'SELECT COUNT(*) FROM politicians WHERE total_votes = 0'
+    );
+
+    res.json({ processed, gotVotes, errors, remaining: parseInt(remaining) });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // POST /api/politicians/:id/sync
 router.post('/:id/sync', async (req, res) => {
   const { id } = req.params;
