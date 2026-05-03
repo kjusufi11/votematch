@@ -14,13 +14,15 @@ const SUBJECTS = ['', 'Health', 'Armed Forces', 'Taxation', 'Environmental', 'Im
 
 export default function PoliticianProfile() {
   const { id } = useParams();
-  const [pol,       setPol]       = useState(null);
-  const [allVotes,  setAllVotes]  = useState([]);
-  const [biases,    setBiases]    = useState([]);
-  const [analysis,  setAnalysis]  = useState(null);
-  const [analyzing, setAnalyzing] = useState(false);
-  const [loading,   setLoading]   = useState(true);
-  const [error,     setError]     = useState('');
+  const [pol,           setPol]           = useState(null);
+  const [allVotes,      setAllVotes]      = useState([]);
+  const [biases,        setBiases]        = useState([]);
+  const [analysis,      setAnalysis]      = useState(null);
+  const [analyzing,     setAnalyzing]     = useState(false);
+  const [loading,       setLoading]       = useState(true);
+  const [error,         setError]         = useState('');
+  const [alignment,     setAlignment]     = useState(null);
+  const [alignLoading,  setAlignLoading]  = useState(false);
   // Vote filters
   const [search,    setSearch]    = useState('');
   const [posFilter, setPosFilter] = useState('');
@@ -50,6 +52,32 @@ export default function PoliticianProfile() {
       setAllVotes(votes);
     } catch (err) { setError(getErrorMessage(err)); }
     finally { setLoading(false); }
+
+    // Load alignment separately so it doesn't block the page
+    loadAlignment();
+  }
+
+  async function loadAlignment() {
+    try {
+      const stored = localStorage.getItem('vm_user');
+      if (!stored) return;
+      const user = JSON.parse(stored);
+      if (!user?.id) return;
+      setAlignLoading(true);
+      const API = process.env.REACT_APP_API_URL || 'https://votemap-production.up.railway.app';
+      const token = localStorage.getItem('vm_token');
+      const res = await fetch(`${API}/api/politicians/${id}/alignment?userId=${user.id}`, {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setAlignment(data);
+      }
+    } catch (err) {
+      console.warn('Alignment load failed:', err.message);
+    } finally {
+      setAlignLoading(false);
+    }
   }
 
   async function runAnalysis() {
@@ -92,6 +120,9 @@ export default function PoliticianProfile() {
   const corruptionBiases = biases.filter(b => b.flag === 'corruption');
   const foreignBiases    = biases.filter(b => b.flag === 'foreign');
   const standardBiases   = biases.filter(b => !b.flag);
+
+  // Alignment score color
+  const scoreColor = alignment?.score >= 70 ? 'var(--green)' : alignment?.score >= 45 ? 'var(--amber)' : 'var(--red)';
 
   return (
     <main style={{ maxWidth: 980, margin: '0 auto', padding: '2.5rem 1.5rem 5rem' }}>
@@ -214,6 +245,78 @@ export default function PoliticianProfile() {
 
         {/* RIGHT: Analysis */}
         <section style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+
+          {/* YOUR ALIGNMENT — shown if logged in */}
+          {(alignment || alignLoading) && (
+            <>
+              <SectionLabel>Your alignment</SectionLabel>
+              <Panel title="How well do they represent you?">
+                <div style={{ padding: '1.125rem 1.25rem' }}>
+                  {alignLoading ? (
+                    <p style={{ fontSize: 12, color: 'var(--text-3)', fontFamily: 'var(--font-mono)' }}>Calculating…</p>
+                  ) : alignment?.score == null ? (
+                    <p style={{ fontSize: 13, color: 'var(--text-3)' }}>
+                      Complete the <Link to="/survey" style={{ color: 'var(--text-2)' }}>values survey</Link> to see your alignment score.
+                    </p>
+                  ) : (
+                    <>
+                      {/* Overall score */}
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '1.25rem', paddingBottom: '1rem', borderBottom: '1px solid var(--border)' }}>
+                        <div style={{
+                          width: 56, height: 56, borderRadius: '50%', flexShrink: 0,
+                          border: `2px solid ${scoreColor}`,
+                          display: 'flex', alignItems: 'center', justifyContent: 'center',
+                          fontFamily: 'var(--font-display)', fontSize: 20, fontWeight: 900,
+                          color: scoreColor,
+                        }}>{alignment.score}%</div>
+                        <div>
+                          <p style={{ fontSize: 13, color: 'var(--text)', fontWeight: 600, marginBottom: 2 }}>
+                            {alignment.score >= 70 ? 'Strong match' : alignment.score >= 45 ? 'Partial match' : 'Low match'}
+                          </p>
+                          <p style={{ fontSize: 11, color: 'var(--text-3)', fontFamily: 'var(--font-mono)' }}>
+                            Based on {alignment.issuesAnalyzed} issue{alignment.issuesAnalyzed !== 1 ? 's' : ''}
+                          </p>
+                        </div>
+                      </div>
+
+                      {/* Per-domain breakdown */}
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '.625rem' }}>
+                        {alignment.breakdown
+                          .filter(d => d.hasUserAnswer && d.agreementPct !== null)
+                          .map(domain => {
+                            const pct = domain.agreementPct;
+                            const color = pct >= 70 ? 'var(--green)' : pct >= 45 ? 'var(--amber)' : 'var(--red)';
+                            return (
+                              <div key={domain.domain}>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+                                  <span style={{ fontSize: 12, color: 'var(--text-2)' }}>
+                                    {domain.icon} {domain.label}
+                                  </span>
+                                  <span style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color, fontWeight: 600 }}>
+                                    {pct}%
+                                  </span>
+                                </div>
+                                <div style={{ height: 3, background: 'var(--bg-3)', borderRadius: 2, overflow: 'hidden' }}>
+                                  <div style={{
+                                    height: '100%', width: `${pct}%`,
+                                    background: color,
+                                    borderRadius: 2,
+                                    transition: 'width 0.6s ease',
+                                  }} />
+                                </div>
+                                <p style={{ fontSize: 10, fontFamily: 'var(--font-mono)', color: 'var(--text-3)', marginTop: 2 }}>
+                                  {domain.voteCount} votes analyzed
+                                </p>
+                              </div>
+                            );
+                          })}
+                      </div>
+                    </>
+                  )}
+                </div>
+              </Panel>
+            </>
+          )}
 
           {/* Standard biases */}
           <SectionLabel>Voting pattern analysis</SectionLabel>
