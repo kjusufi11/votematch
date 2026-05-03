@@ -1,12 +1,15 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import AuthModal from './AuthModal';
 
 export default function Nav() {
   const { pathname } = useLocation();
-  const { user, logout, isLoggedIn } = useAuth();
+  const { logout, isLoggedIn } = useAuth();
   const [showAuth, setShowAuth] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
+
+  useEffect(() => { setMenuOpen(false); }, [pathname]);
 
   return (
     <>
@@ -35,7 +38,8 @@ export default function Nav() {
             }}>VoteMap</span>
           </Link>
 
-          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+          {/* Desktop nav — hidden on mobile via CSS class */}
+          <div className="nav-links-desktop" style={{ gap: 8, alignItems: 'center' }}>
             {pathname !== '/' && (
               <Link to="/" style={{
                 fontSize: 12, color: 'var(--text-2)',
@@ -45,7 +49,6 @@ export default function Nav() {
                 fontFamily: 'var(--font-mono)',
               }}>← Change ZIP</Link>
             )}
-
             {isLoggedIn ? (
               <>
                 <Link to="/survey" style={{
@@ -69,8 +72,76 @@ export default function Nav() {
               }}>Sign in</button>
             )}
           </div>
+
+          {/* Hamburger — shown on mobile via CSS class */}
+          <button
+            className="nav-hamburger"
+            onClick={() => setMenuOpen(x => !x)}
+            aria-label="Toggle menu"
+            aria-expanded={menuOpen}
+            style={{
+              alignItems: 'center', justifyContent: 'center',
+              width: 36, height: 36,
+              border: '1px solid var(--border-med)',
+              borderRadius: 'var(--radius)',
+              background: 'none',
+              cursor: 'pointer',
+              fontSize: 18,
+              color: 'var(--text)',
+              lineHeight: 1,
+              flexShrink: 0,
+            }}
+          >{menuOpen ? '✕' : '☰'}</button>
         </div>
       </nav>
+
+      {/* Mobile dropdown menu */}
+      {menuOpen && (
+        <div style={{
+          position: 'fixed', top: 54, left: 0, right: 0, zIndex: 99,
+          background: 'rgba(245,243,238,0.98)',
+          backdropFilter: 'blur(16px)',
+          WebkitBackdropFilter: 'blur(16px)',
+          borderBottom: '1px solid var(--border)',
+          padding: '0 1.5rem',
+          display: 'flex', flexDirection: 'column',
+          boxShadow: '0 4px 16px rgba(0,0,0,0.08)',
+        }}>
+          {pathname !== '/' && (
+            <Link to="/" style={{
+              fontSize: 14, fontFamily: 'var(--font-mono)',
+              color: 'var(--text-2)', padding: '0.875rem 0',
+              borderBottom: '1px solid var(--border)',
+              display: 'block',
+            }}>← Change ZIP</Link>
+          )}
+          {isLoggedIn ? (
+            <>
+              <Link to="/survey" style={{
+                fontSize: 14, fontFamily: 'var(--font-mono)',
+                color: 'var(--text-2)', padding: '0.875rem 0',
+                borderBottom: '1px solid var(--border)',
+                display: 'block',
+              }}>My Values</Link>
+              <button onClick={() => { logout(); setMenuOpen(false); }} style={{
+                fontSize: 14, fontFamily: 'var(--font-mono)',
+                color: 'var(--text-3)', background: 'none',
+                border: 'none', borderTop: 'none',
+                cursor: 'pointer', padding: '0.875rem 0',
+                textAlign: 'left', display: 'block',
+              }}>Sign out</button>
+            </>
+          ) : (
+            <button onClick={() => { setShowAuth(true); setMenuOpen(false); }} style={{
+              fontSize: 14, fontFamily: 'var(--font-mono)',
+              color: 'var(--text)', background: 'none',
+              border: 'none', cursor: 'pointer',
+              padding: '0.875rem 0', textAlign: 'left',
+              fontWeight: 500, display: 'block',
+            }}>Sign in →</button>
+          )}
+        </div>
+      )}
 
       {showAuth && <AuthModal onClose={() => setShowAuth(false)} />}
     </>

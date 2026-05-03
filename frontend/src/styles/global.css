@@ -104,3 +104,23 @@ input, select {
 .delay-3 { animation-delay: 0.15s; }
 .delay-4 { animation-delay: 0.2s; }
 .delay-5 { animation-delay: 0.25s; }
+
+/* ─── Responsive ─────────────────────────────────────────────────── */
+
+/* Nav: desktop links visible, hamburger hidden by default */
+.nav-links-desktop { display: flex; }
+.nav-hamburger     { display: none; }
+
+/* Profile page two-column grid */
+.profile-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr);
+  gap: 1.25rem;
+  align-items: start;
+}
+
+@media (max-width: 700px) {
+  .nav-links-desktop { display: none; }
+  .nav-hamburger     { display: flex; }
+  .profile-grid      { grid-template-columns: 1fr; gap: 0.75rem; }
+}

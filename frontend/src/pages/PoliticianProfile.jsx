@@ -168,8 +168,8 @@ export default function PoliticianProfile() {
         </div>
       </header>
 
-      {/* Two column */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1.15fr) minmax(0,1fr)', gap: '1.25rem', alignItems: 'start' }}>
+      {/* Two column — collapses to single on mobile via .profile-grid CSS class */}
+      <div className="profile-grid">
 
         {/* LEFT: Vote history */}
         <section>
