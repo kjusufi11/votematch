@@ -262,6 +262,31 @@ router.post('/:id/analyze', async (req, res) => {
   }
 });
 
+// POST /api/politicians/sync-all-stats
+// Recalculates total_votes / missed_votes_pct / party_loyalty_pct for every
+// politician in the DB using the votes already stored locally.
+// Does NOT call the Congress.gov API — safe to run at any time.
+router.post('/sync-all-stats', async (req, res) => {
+  try {
+    const ids = await db.query('SELECT id FROM politicians ORDER BY id');
+    const results = { updated: 0, skipped: 0, errors: [] };
+
+    for (const { id } of ids.rows) {
+      try {
+        await sync.updatePoliticianStats(id);
+        results.updated++;
+      } catch (err) {
+        results.errors.push({ id, error: err.message });
+        results.skipped++;
+      }
+    }
+
+    res.json({ success: true, total: ids.rows.length, ...results });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // POST /api/politicians/:id/sync
 router.post('/:id/sync', async (req, res) => {
   const { id } = req.params;
