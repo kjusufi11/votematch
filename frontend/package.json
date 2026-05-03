@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "private": true,
   "engines": {
-    "node": ">=20.0.0"
+    "node": ">=18.0.0"
   },
   "scripts": {
     "dev": "vite",
@@ -15,7 +15,7 @@
     "react-dom": "^18.2.0",
     "react-router-dom": "^6.21.0",
     "axios": "^1.6.0",
-    "@clerk/react": "^6.5.0"
+    "@clerk/react": "^5.54.0"
   },
   "devDependencies": {
     "@vitejs/plugin-react": "^4.2.0",
