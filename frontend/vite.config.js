@@ -3,10 +3,17 @@ import react from '@vitejs/plugin-react';
 
 export default defineConfig({
   plugins: [react()],
+  optimizeDeps: {
+    include: ['@clerk/react'],
+  },
+  build: {
+    commonjsOptions: {
+      include: [/node_modules/],
+    },
+  },
   server: {
     port: 3000,
     proxy: {
-      // Proxy /api calls to the backend during development
       '/api': {
         target: 'http://localhost:3001',
         changeOrigin: true,

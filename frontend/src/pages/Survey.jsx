@@ -1,5 +1,6 @@
+import { useAuth } from '../contexts/AuthContext';
 import React, { useState, useEffect } from 'react';
-import { useUser } from '@clerk/react';
+
 import { useNavigate } from 'react-router-dom';
 import { saveSurvey, getSurvey } from '../services/api';
 
@@ -123,7 +124,8 @@ const IMPORTANCE_LABELS = {
 };
 
 export default function Survey() {
-  const { user } = useUser();
+  const { user } = useAuth();
+  // user.id from our auth
   const navigate = useNavigate();
   const [answers, setAnswers] = useState({});
   const [importance, setImportance] = useState({});

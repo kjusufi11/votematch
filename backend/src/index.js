@@ -7,6 +7,7 @@ const rateLimit = require('express-rate-limit');
 const lookupRoutes    = require('./routes/lookup');
 const politicianRoutes = require('./routes/politicians');
 const surveyRoutes    = require('./routes/survey');
+const authRoutes      = require('./routes/auth');
 
 const app  = express();
 const PORT = process.env.PORT || 3001;
@@ -49,6 +50,7 @@ app.use('/api/politicians/:id/analyze', analysisLimiter);
 app.use('/api/lookup', lookupRoutes);
 app.use('/api/politicians', politicianRoutes);
 app.use('/api/survey', surveyRoutes);
+app.use('/api/auth', authRoutes);
 
 // Health check
 app.get('/health', (req, res) => {
