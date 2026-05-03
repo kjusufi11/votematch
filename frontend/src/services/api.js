@@ -52,6 +52,23 @@ export async function searchPoliticians(query = {}) {
   return data;
 }
 
+// ── Survey ────────────────────────────────────────────────────────────────────
+
+export async function saveSurvey(userId, surveyData) {
+  const { data } = await api.post(`/survey/${userId}`, surveyData);
+  return data;
+}
+
+export async function getSurvey(userId) {
+  try {
+    const { data } = await api.get(`/survey/${userId}`);
+    return data;
+  } catch (err) {
+    if (err?.response?.status === 404) return null;
+    throw err;
+  }
+}
+
 // ── Error helpers ─────────────────────────────────────────────────────────────
 
 export function getErrorMessage(err) {

@@ -1,5 +1,6 @@
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
+import { SignedIn, SignedOut, UserButton, SignInButton } from '@clerk/react';
 
 export default function Nav() {
   const { pathname } = useLocation();
@@ -31,12 +32,6 @@ export default function Nav() {
         </Link>
 
         <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-          <span style={{
-            fontSize: 10, fontFamily: 'var(--font-mono)',
-            color: 'var(--amber)', border: '1px solid var(--amber-dim)',
-            borderRadius: 20, padding: '3px 10px', letterSpacing: '.08em',
-            background: 'var(--amber-dim)',
-          }}>Demo</span>
           {pathname !== '/' && (
             <Link to="/" style={{
               fontSize: 12, color: 'var(--text-2)',
@@ -49,6 +44,32 @@ export default function Nav() {
               ← Change ZIP
             </Link>
           )}
+
+          <SignedIn>
+            <Link to="/survey" style={{
+              fontSize: 12, fontFamily: 'var(--font-mono)',
+              color: 'var(--text-2)', padding: '5px 12px',
+              border: '1px solid var(--border-med)', borderRadius: 20,
+              transition: 'all var(--transition)',
+            }}>
+              My Values
+            </Link>
+            <UserButton afterSignOutUrl="/" />
+          </SignedIn>
+
+          <SignedOut>
+            <SignInButton mode="modal">
+              <button style={{
+                fontSize: 12, fontFamily: 'var(--font-mono)',
+                color: 'var(--text)', padding: '5px 14px',
+                border: '1px solid var(--border-med)', borderRadius: 20,
+                background: 'var(--text)', color: 'var(--bg-2)',
+                cursor: 'pointer', transition: 'all var(--transition)',
+              }}>
+                Sign in
+              </button>
+            </SignInButton>
+          </SignedOut>
         </div>
       </div>
     </nav>
