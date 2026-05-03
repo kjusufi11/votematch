@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import BiasBar from '../components/BiasBar';
-import { getPolitician, getPoliticianVotes, triggerAnalysis, getErrorMessage } from '../services/api';
+import { getPolitician, getPoliticianVotes, triggerAnalysis, getErrorMessage, getConflicts } from '../services/api';
 import { classifyVote, getDomain } from '../utils/domainClassifier';
 
 const PC = { D: 'var(--party-d)', R: 'var(--party-r)', I: 'var(--party-i)' };
@@ -24,6 +24,8 @@ export default function PoliticianProfile() {
   const [error,         setError]         = useState('');
   const [alignment,     setAlignment]     = useState(null);
   const [alignLoading,  setAlignLoading]  = useState(false);
+  const [conflicts,     setConflicts]     = useState(null);
+  const [conflictsLoading, setConflictsLoading] = useState(false);
   // Vote filters
   const [search,    setSearch]    = useState('');
   const [posFilter, setPosFilter] = useState('');
@@ -54,8 +56,18 @@ export default function PoliticianProfile() {
     } catch (err) { setError(getErrorMessage(err)); }
     finally { setLoading(false); }
 
-    // Load alignment separately so it doesn't block the page
+    // Load alignment and conflicts separately so they don't block the page
     loadAlignment();
+    loadConflicts();
+  }
+
+  async function loadConflicts() {
+    setConflictsLoading(true);
+    try {
+      const result = await getConflicts(id);
+      setConflicts(result);
+    } catch { setConflicts({ conflicts: [], topDonors: [] }); }
+    finally { setConflictsLoading(false); }
   }
 
   async function loadAlignment() {
@@ -352,6 +364,60 @@ export default function PoliticianProfile() {
             </Panel>
           )}
 
+          {/* FEC Conflicts of Interest */}
+          {(conflictsLoading || (conflicts?.conflicts?.length > 0)) && (
+            <Panel title="⚑ Conflicts of interest" titleColor="var(--gold)" headerBg="var(--gold-dim)">
+              <div style={{ padding: '.875rem 1.25rem' }}>
+                {conflictsLoading ? (
+                  <p style={{ fontSize: 12, color: 'var(--text-3)', fontFamily: 'var(--font-mono)' }}>Loading FEC donor data…</p>
+                ) : (
+                  <>
+                    <p style={{ fontSize: 12, color: 'var(--text-3)', fontFamily: 'var(--font-mono)', marginBottom: '1rem', lineHeight: 1.55 }}>
+                      Top donor industries cross-referenced with voting record. Flagged when a politician votes with a donor industry's interests in {'>'}80% of relevant votes.
+                    </p>
+                    {conflicts.conflicts.map((c, i) => {
+                      const d = getDomain(c.domain);
+                      const pct = c.vote_alignment_pct;
+                      return (
+                        <div key={i} style={{
+                          paddingBottom: i < conflicts.conflicts.length - 1 ? '.875rem' : 0,
+                          marginBottom:  i < conflicts.conflicts.length - 1 ? '.875rem' : 0,
+                          borderBottom:  i < conflicts.conflicts.length - 1 ? '1px solid var(--border)' : 'none',
+                        }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 4 }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                              <span style={{ fontSize: 13, color: 'var(--text)', fontWeight: 500 }}>
+                                {d?.icon} {c.industry}
+                              </span>
+                              <span style={{
+                                fontSize: 9, fontFamily: 'var(--font-mono)', padding: '2px 7px',
+                                borderRadius: 3, letterSpacing: '.06em', textTransform: 'uppercase',
+                                background: 'var(--gold-dim)', color: 'var(--gold)',
+                              }}>⚑ FEC</span>
+                            </div>
+                            <span style={{ fontSize: 13, fontFamily: 'var(--font-mono)', fontWeight: 500, color: 'var(--gold)', flexShrink: 0 }}>
+                              {pct}%
+                            </span>
+                          </div>
+                          <div style={{ height: 3, background: 'var(--bg-3)', borderRadius: 2, overflow: 'hidden', marginBottom: 5 }}>
+                            <div style={{
+                              height: '100%', width: `${pct}%`,
+                              background: 'var(--gold)', borderRadius: 2,
+                              transition: 'width 0.9s cubic-bezier(0.16, 1, 0.3, 1)',
+                            }} />
+                          </div>
+                          <p style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-3)', lineHeight: 1.5 }}>
+                            ${c.donor_amount.toLocaleString()} from {c.donor_org} · voted against {d?.label?.toLowerCase() || c.domain} reform in {pct}% of {c.vote_count} votes
+                          </p>
+                        </div>
+                      );
+                    })}
+                  </>
+                )}
+              </div>
+            </Panel>
+          )}
+
           {/* Foreign influence */}
           {foreignBiases.length > 0 && (
             <Panel title="◈ Foreign influence indicators" titleColor="var(--orange)" headerBg="var(--orange-dim)">
@@ -402,7 +468,7 @@ export default function PoliticianProfile() {
       </div>
 
       <div style={{ marginTop: '3rem', paddingTop: '1.5rem', borderTop: '1px solid var(--border)', display: 'flex', flexWrap: 'wrap', gap: 16, justifyContent: 'space-between', alignItems: 'center' }}>
-        <span style={{ fontSize: 11, color: 'var(--text-3)', fontFamily: 'var(--font-mono)' }}>Vote data: ProPublica · Analysis: Claude AI · Ideology: DW-NOMINATE</span>
+        <span style={{ fontSize: 11, color: 'var(--text-3)', fontFamily: 'var(--font-mono)' }}>Vote data: Congress.gov · Donor data: FEC · Analysis: Claude AI · Ideology: DW-NOMINATE</span>
         <Link to="/reps" style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-2)', border: '1px solid var(--border-med)', borderRadius: 'var(--radius)', padding: '5px 10px' }}>← Back</Link>
       </div>
     </main>

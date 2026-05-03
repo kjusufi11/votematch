@@ -86,6 +86,15 @@ export async function getAlignment(userId, politicianIds) {
   }
 }
 
+export async function getConflicts(politicianId) {
+  try {
+    const { data } = await api.get(`/politicians/${politicianId}/conflicts`);
+    return data;
+  } catch {
+    return { conflicts: [], topDonors: [] };
+  }
+}
+
 export async function getAlignmentForPolitician(politicianId, userId) {
   const base = (import.meta.env.VITE_API_URL || 'https://api.votematch.app').replace(/\/api$/, '');
   const token = localStorage.getItem('votemap_token');

@@ -121,6 +121,20 @@ const migrations = [
     raw_response    JSONB,
     looked_up_at    TIMESTAMPTZ DEFAULT NOW()
   )`,
+
+  // ── FEC Conflict Cache ────────────────────────────────────────────────────
+  // Cross-reference of FEC donor data vs voting record, cached 7 days
+  `CREATE TABLE IF NOT EXISTS fec_conflicts (
+    politician_id    TEXT PRIMARY KEY REFERENCES politicians(id) ON DELETE CASCADE,
+    fec_candidate_id TEXT,
+    top_donors       JSONB DEFAULT '[]',
+    conflicts        JSONB DEFAULT '[]',
+    computed_at      TIMESTAMPTZ DEFAULT NOW()
+  )`,
+
+  // ── Schema patches ────────────────────────────────────────────────────────
+  // Add flag column to bias_scores (for corruption/foreign influence tagging)
+  `ALTER TABLE bias_scores ADD COLUMN IF NOT EXISTS flag TEXT`,
 ];
 
 async function migrate() {

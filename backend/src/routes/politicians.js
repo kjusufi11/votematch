@@ -8,6 +8,7 @@ const sync = require('../services/sync');
 const mockData = require('../services/mockData');
 const { classifyVote, getAllDomains } = require('../services/domainClassifier');
 const { calculateAlignment } = require('../services/alignmentEngine');
+const { detectConflicts } = require('../services/conflictDetector');
 
 // GET /api/politicians/debug/count — must be BEFORE /:id route
 router.get('/debug/count', async (req, res) => {
@@ -190,6 +191,18 @@ router.get('/:id/votes', async (req, res) => {
   }
 });
 
+// GET /api/politicians/:id/conflicts
+router.get('/:id/conflicts', async (req, res) => {
+  const { id } = req.params;
+  try {
+    const result = await detectConflicts(id);
+    res.json(result);
+  } catch (err) {
+    console.error('Conflict detection error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // GET /api/politicians/:id/analysis
 router.get('/:id/analysis', async (req, res) => {
   const { id } = req.params;
@@ -228,7 +241,7 @@ router.get('/:id', async (req, res) => {
           json_agg(json_build_object(
             'category', bs.category, 'label', bs.label, 'score', bs.score,
             'direction', bs.direction, 'confidence', bs.confidence,
-            'vote_count', bs.vote_count, 'summary', bs.summary
+            'vote_count', bs.vote_count, 'summary', bs.summary, 'flag', bs.flag
           ) ORDER BY bs.score DESC) FILTER (WHERE bs.category IS NOT NULL), '[]'
         ) as bias_scores
       FROM politicians p
