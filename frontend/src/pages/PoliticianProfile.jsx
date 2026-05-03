@@ -59,13 +59,13 @@ export default function PoliticianProfile() {
 
   async function loadAlignment() {
     try {
-      const stored = localStorage.getItem('vm_user');
+      const stored = localStorage.getItem('votemap_user');
       if (!stored) return;
       const user = JSON.parse(stored);
       if (!user?.id) return;
       setAlignLoading(true);
-      const API = process.env.REACT_APP_API_URL || 'https://votemap-production.up.railway.app';
-      const token = localStorage.getItem('vm_token');
+      const API = import.meta.env.VITE_API_URL || 'https://votemap-production.up.railway.app';
+      const token = localStorage.getItem('votemap_token');
       const res = await fetch(`${API}/api/politicians/${id}/alignment?userId=${user.id}`, {
         headers: token ? { Authorization: `Bearer ${token}` } : {},
       });
