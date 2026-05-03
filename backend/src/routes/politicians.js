@@ -6,6 +6,8 @@ const db = require('../db');
 const biasEngine = require('../services/biasEngine');
 const sync = require('../services/sync');
 const mockData = require('../services/mockData');
+const { classifyVote, getAllDomains } = require('../services/domainClassifier');
+const { calculateAlignment } = require('../services/alignmentEngine');
 
 // GET /api/politicians/debug/count — must be BEFORE /:id route
 router.get('/debug/count', async (req, res) => {
@@ -128,6 +130,130 @@ router.get('/:id/votes', async (req, res) => {
     });
   } catch (err) {
     console.error(err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// GET /api/politicians/:id/alignment?userId=123
+router.get('/:id/alignment', async (req, res) => {
+  const { id } = req.params;
+  const { userId } = req.query;
+
+  if (!userId) {
+    return res.status(400).json({ error: 'userId is required' });
+  }
+
+  try {
+    // Overall alignment score from existing engine
+    const overall = await calculateAlignment(userId, id);
+    if (!overall) {
+      return res.json({ score: null, breakdown: [], message: 'Complete the values survey to see alignment.' });
+    }
+
+    // All votes for this politician
+    const votesResult = await db.query(`
+      SELECT v.position, v.description, v.question,
+             b.title, b.short_title, b.primary_subject, b.categories
+      FROM votes v
+      LEFT JOIN bills b ON v.bill_id = b.id
+      WHERE v.politician_id = $1
+      AND v.position NOT IN ('Not Voting', 'Present')
+    `, [id]);
+
+    const allVotes = votesResult.rows;
+    const domains = getAllDomains();
+
+    // Classify each vote into a domain and tally yes/no
+    const domainVotes = {};
+    for (const vote of allVotes) {
+      const domain = classifyVote(vote);
+      if (!domain) continue;
+      if (!domainVotes[domain]) domainVotes[domain] = { yes: 0, no: 0, total: 0 };
+      const pos = vote.position?.toLowerCase();
+      if (pos === 'yes' || pos === 'yea') domainVotes[domain].yes++;
+      else if (pos === 'no' || pos === 'nay') domainVotes[domain].no++;
+      domainVotes[domain].total++;
+    }
+
+    // User's survey answers
+    const surveyResult = await db.query(
+      'SELECT answers FROM user_surveys WHERE user_id = $1',
+      [String(userId)]
+    );
+    const userAnswers = surveyResult.rows[0]?.answers || {};
+
+    // Map survey issue IDs → domain keys
+    const ISSUE_TO_DOMAIN = {
+      healthcare: 'healthcare',
+      climate: 'climate',
+      immigration: 'immigration',
+      gun_policy: 'gun_policy',
+      taxes: 'economy',
+      defense: 'defense',
+      reproductive_rights: 'reproductive_rights',
+      education: 'education',
+      safety_net: 'safety_net',
+      criminal_justice: 'criminal_justice',
+    };
+
+    // Which direction counts as "progressive" per domain
+    const PROGRESSIVE_IS_YES = {
+      healthcare: true,
+      climate: true,
+      immigration: false,
+      gun_policy: true,
+      economy: true,
+      defense: false,
+      reproductive_rights: true,
+      education: true,
+      safety_net: true,
+      criminal_justice: false,
+      voting_rights: true,
+      infrastructure: true,
+    };
+
+    // Build per-domain breakdown
+    const domainBreakdown = [];
+
+    for (const [domainKey, domainConfig] of Object.entries(domains)) {
+      const votes = domainVotes[domainKey];
+      if (!votes || votes.total < 3) continue;
+
+      const surveyIssue = Object.entries(ISSUE_TO_DOMAIN).find(([, d]) => d === domainKey)?.[0];
+      const userValue = surveyIssue ? userAnswers[surveyIssue] : null;
+
+      const progressiveIsYes = PROGRESSIVE_IS_YES[domainKey] ?? true;
+      const politicianProgressiveVotes = progressiveIsYes ? votes.yes : votes.no;
+      const politicianProgressivePct = Math.round((politicianProgressiveVotes / votes.total) * 100);
+
+      let agreementPct = null;
+      if (userValue !== null && userValue !== undefined) {
+        const userProgressivePct = Math.round(((2 - userValue) / 4) * 100);
+        agreementPct = 100 - Math.abs(userProgressivePct - politicianProgressivePct);
+      }
+
+      domainBreakdown.push({
+        domain: domainKey,
+        label: domainConfig.label,
+        icon: domainConfig.icon,
+        voteCount: votes.total,
+        politicianProgressivePct,
+        agreementPct,
+        hasUserAnswer: userValue !== null && userValue !== undefined,
+      });
+    }
+
+    domainBreakdown.sort((a, b) => b.voteCount - a.voteCount);
+
+    res.json({
+      score: overall.score,
+      issuesAnalyzed: overall.issuesAnalyzed,
+      breakdown: domainBreakdown,
+      surveyBreakdown: overall.breakdown,
+    });
+
+  } catch (err) {
+    console.error('Alignment breakdown error:', err);
     res.status(500).json({ error: err.message });
   }
 });
