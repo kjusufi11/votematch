@@ -35,7 +35,7 @@ export default function Nav() {
             <span style={{
               fontFamily: 'var(--font-display)', fontSize: 19, fontWeight: 900,
               letterSpacing: '-.02em', color: 'var(--text)',
-            }}>VoteMap</span>
+            }}>VoteMatch</span>
           </Link>
 
           {/* Desktop nav — hidden on mobile via CSS class */}

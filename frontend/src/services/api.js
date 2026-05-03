@@ -87,7 +87,7 @@ export async function getAlignment(userId, politicianIds) {
 }
 
 export async function getAlignmentForPolitician(politicianId, userId) {
-  const base = (import.meta.env.VITE_API_URL || 'https://votemap-production.up.railway.app').replace(/\/api$/, '');
+  const base = (import.meta.env.VITE_API_URL || 'https://api.votematch.app').replace(/\/api$/, '');
   const token = localStorage.getItem('votemap_token');
   try {
     const res = await fetch(`${base}/api/politicians/${politicianId}/alignment?userId=${userId}`, {
