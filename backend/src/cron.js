@@ -39,7 +39,7 @@ async function run() {
 
     for (const pol of result.rows) {
       try {
-        const count = await sync.syncVotesForPolitician(pol.id, 2); // 2 pages = ~40 votes
+        const count = await sync.syncVotesForPolitician(pol.id, 2); // offset 2 = skip most-recent, pick up slightly older
         votesTotal += count;
         process.stdout.write('.');
       } catch (err) {

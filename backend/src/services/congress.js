@@ -1,7 +1,6 @@
 // src/services/congress.js
-// Congress.gov API — official Library of Congress data source
+// Congress.gov API v3 — official Library of Congress data source
 // Docs: https://api.congress.gov/
-// Replaces the deprecated ProPublica Congress API
 
 const axios = require('axios');
 const NodeCache = require('node-cache');
@@ -55,7 +54,7 @@ async function getMembersByState(state, chamber) {
 
 // ── Votes ─────────────────────────────────────────────────────────────────────
 
-// Get all votes for a specific member
+// Get votes for a specific member
 async function getMemberVotes(bioguideId, offset = 0) {
   const data = await get(`/member/${bioguideId}/votes`, { limit: 250, offset });
   return data.votes || [];

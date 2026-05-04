@@ -62,7 +62,6 @@ async function syncSingleMember(bioguideId) {
 }
 
 // ── Sync votes for a politician ───────────────────────────────────────────────
-
 async function syncVotesForPolitician(bioguideId, offset = 0) {
   let synced = 0;
   try {
