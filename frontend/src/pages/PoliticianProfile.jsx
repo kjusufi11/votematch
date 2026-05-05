@@ -54,12 +54,12 @@ export default function PoliticianProfile() {
         rest.forEach(r => { votes = votes.concat(r.votes || []); });
       }
       setAllVotes(votes);
+
+      // Fire after main data — non-blocking, polData must be in scope here
+      loadAlignment();
+      loadConflicts(polData);
     } catch (err) { setError(getErrorMessage(err)); }
     finally { setLoading(false); }
-
-    // Load alignment and conflicts separately so they don't block the page
-    loadAlignment();
-    loadConflicts(polData);
   }
 
   async function loadConflicts(polData) {
