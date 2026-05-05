@@ -113,11 +113,13 @@ const DOMAINS = {
 };
 
 export function classifyVote(vote) {
-  // Nominations are personnel votes, not policy votes. Descriptions like
-  // "Jessica Kramer...EPA Assistant Administrator" match climate keywords
-  // but have nothing to do with climate policy.
+  // Skip personnel and procedural votes — they match policy keywords accidentally
+  // or don't reflect the senator's actual policy position.
   const q = vote.question || '';
   if (/\bnomination\b/i.test(q) || /\bPN\d/i.test(q)) return null;
+  if (/\bmotion to proceed\b/i.test(q)) return null;
+  if (/\bpoint of order\b/i.test(q)) return null;
+  if (/\bmotion to discharge\b/i.test(q)) return null;
 
   const searchText = [
     vote.description || '',

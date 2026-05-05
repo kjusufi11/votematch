@@ -7,7 +7,7 @@
 // GET /api/politicians/:id/conflicts returns the cached result only.
 
 const db = require('../db');
-const { classifyVote } = require('./domainClassifier');
+const { classifyVote, effectivePosition } = require('./domainClassifier');
 
 const MIN_DONATION       = 10000;
 const MIN_VOTES          = 5;
@@ -126,8 +126,9 @@ async function detectConflictsFromEmployers(politicianId, employers, fecCandidat
     const domain = classifyVote(vote);
     if (!domain) continue;
     if (!domainVotes[domain]) domainVotes[domain] = { yes: 0, no: 0, total: 0 };
-    if (vote.position === 'Yes') domainVotes[domain].yes++;
-    else                         domainVotes[domain].no++;
+    const pos = effectivePosition(vote);
+    if (pos === 'Yes') domainVotes[domain].yes++;
+    else               domainVotes[domain].no++;
     domainVotes[domain].total++;
   }
 

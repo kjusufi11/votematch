@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import BiasBar from './BiasBar';
+import Avatar from './Avatar';
 import { triggerAnalysis, getAlignmentForPolitician } from '../services/api';
 
 const partyColor = p => p === 'D' ? 'var(--party-d)' : p === 'R' ? 'var(--party-r)' : 'var(--party-i)';
@@ -64,15 +65,7 @@ export default function RepresentativeCard({ rep, index, alignment: alignmentPro
         display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '1rem', flexWrap: 'wrap',
       }}>
         <div style={{ display: 'flex', gap: '.875rem', alignItems: 'flex-start' }}>
-          <div style={{
-            width: 48, height: 48, borderRadius: '50%', flexShrink: 0,
-            background: partyDim(party), color: partyColor(party),
-            border: `1px solid ${partyColor(party)}28`,
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            fontFamily: 'var(--font-display)', fontSize: 15, fontWeight: 700,
-          }}>
-            {initials}
-          </div>
+          <Avatar id={profile?.id} name={rep.name} party={party} size={48} fontSize={15} />
           <div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginBottom: 3 }}>
               <h2 style={{ fontFamily: 'var(--font-display)', fontSize: 19, fontWeight: 700, letterSpacing: '-.01em' }}>

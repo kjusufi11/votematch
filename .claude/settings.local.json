@@ -72,7 +72,8 @@
       "PowerShell(Invoke-RestMethod -Method POST -Uri \"https://votemap-production.up.railway.app/api/admin/rebuild-votes\" -ContentType \"application/json\")",
       "PowerShell(Invoke-RestMethod -Uri \"https://votemap-production.up.railway.app/api/admin/rebuild-status\" | ConvertTo-Json -Depth 3)",
       "WebFetch(domain:votemap-production.up.railway.app)",
-      "WebFetch(domain:api.fec.gov)"
+      "WebFetch(domain:api.fec.gov)",
+      "PowerShell(Get-ChildItem \"C:\\\\Users\\\\krena\\\\AppData\\\\Local\" -Directory -ErrorAction SilentlyContinue | Where-Object { $_.Name -match \"git|github\" } | Select-Object FullName)"
     ]
   }
 }

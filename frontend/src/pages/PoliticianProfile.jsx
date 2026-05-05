@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import BiasBar from '../components/BiasBar';
+import Avatar from '../components/Avatar';
 import { getPolitician, getPoliticianVotes, triggerAnalysis, getErrorMessage, getConflicts, computeConflicts } from '../services/api';
 import { findCandidateId, getCommitteeId, getTopEmployers } from '../services/fecClient';
 import { classifyVote, getDomain } from '../utils/domainClassifier';
@@ -177,13 +178,7 @@ export default function PoliticianProfile() {
 
       {/* Profile header */}
       <header className="animate-fade-up" style={{ display: 'flex', gap: '1.5rem', alignItems: 'flex-start', marginBottom: '2.25rem', flexWrap: 'wrap' }}>
-        <div style={{
-          width: 76, height: 76, borderRadius: '50%', flexShrink: 0,
-          background: PD[pol.party] || 'var(--bg-3)', color: PC[pol.party] || 'var(--text-2)',
-          border: `1px solid ${PC[pol.party] || 'var(--border-med)'}28`,
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          fontFamily: 'var(--font-display)', fontSize: 26, fontWeight: 700,
-        }}>{ini}</div>
+        <Avatar id={pol.id} name={pol.full_name} party={pol.party} size={76} fontSize={26} />
         <div style={{ flex: 1 }}>
           <h1 style={{ fontFamily: 'var(--font-display)', fontSize: 'clamp(1.9rem, 4vw, 3.1rem)', fontWeight: 900, letterSpacing: '-.022em', lineHeight: 1.04, marginBottom: '.5rem' }}>
             {pol.full_name}

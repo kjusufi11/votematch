@@ -117,11 +117,13 @@ const DOMAINS = {
  * Returns domain key or null if no match
  */
 function classifyVote(vote) {
-  // Nominations are personnel votes, not policy votes. Descriptions like
-  // "Jessica Kramer...EPA Assistant Administrator" match climate keywords
-  // but have nothing to do with climate policy.
+  // Skip personnel and procedural votes — they match policy keywords accidentally
+  // or don't reflect the senator's actual policy position.
   const q = vote.question || '';
   if (/\bnomination\b/i.test(q) || /\bPN\d/i.test(q)) return null;
+  if (/\bmotion to proceed\b/i.test(q)) return null;
+  if (/\bpoint of order\b/i.test(q)) return null;
+  if (/\bmotion to discharge\b/i.test(q)) return null;
 
   const searchText = [
     vote.description || '',
@@ -167,4 +169,18 @@ function getDomain(key) {
   return DOMAINS[key] || null;
 }
 
-module.exports = { classifyVote, getAllDomains, getDomain };
+// Returns the effective policy position of a vote, accounting for framing where
+// YES is the anti-progressive direction:
+//   • Congressional Review Act disapprovals: YES = striking down a regulation
+//   • "To terminate / eliminate / abolish / defund X": YES = removing the program
+function effectivePosition(vote) {
+  if (vote.position !== 'Yes' && vote.position !== 'No') return vote.position;
+  const desc = (vote.description || '').toLowerCase();
+  const inverted =
+    /\bcongressional disapproval\b/.test(desc) ||
+    /^to (terminate|eliminate|abolish|defund)\b/.test(desc);
+  if (!inverted) return vote.position;
+  return vote.position === 'Yes' ? 'No' : 'Yes';
+}
+
+module.exports = { classifyVote, effectivePosition, getAllDomains, getDomain };

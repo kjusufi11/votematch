@@ -6,7 +6,7 @@ const db = require('../db');
 const biasEngine = require('../services/biasEngine');
 const sync = require('../services/sync');
 const mockData = require('../services/mockData');
-const { classifyVote, getAllDomains } = require('../services/domainClassifier');
+const { classifyVote, effectivePosition, getAllDomains } = require('../services/domainClassifier');
 const { calculateAlignment } = require('../services/alignmentEngine');
 const { getCachedConflicts, detectConflictsFromEmployers } = require('../services/conflictDetector');
 const fec = require('../services/fec');
@@ -106,9 +106,9 @@ router.get('/:id/alignment', async (req, res) => {
       const domain = classifyVote(vote);
       if (!domain) continue;
       if (!domainVotes[domain]) domainVotes[domain] = { yes: 0, no: 0, total: 0 };
-      const pos = vote.position?.toLowerCase();
-      if (pos === 'yes' || pos === 'yea') domainVotes[domain].yes++;
-      else if (pos === 'no' || pos === 'nay') domainVotes[domain].no++;
+      const pos = effectivePosition(vote);
+      if (pos === 'Yes') domainVotes[domain].yes++;
+      else if (pos === 'No') domainVotes[domain].no++;
       domainVotes[domain].total++;
     }
 
