@@ -325,4 +325,33 @@ async function rebuildVotes() {
   }
 }
 
-module.exports = { rebuildVotes, progress };
+// Sync Senate votes for a single politician (targeted re-run, no full rebuild needed).
+// lastName and state must match exactly what appears in the Senate clerk XML.
+async function syncSingleSenatorVotes(bioguideId, lastName, state) {
+  const singleMap = {};
+  const ln = lastName.toLowerCase();
+  const st = state.toUpperCase();
+  singleMap[`${ln}|${st}`] = bioguideId;
+  // First-initial fallback key not needed for targeted single-person sync
+
+  log(`Syncing Senate votes for ${bioguideId} (${lastName}, ${st})...`);
+  let inserted = 0;
+
+  for (const session of SESSIONS) {
+    const nums = await senateVoteNums(session);
+    log(`  Session ${session}: ${nums.length} roll calls`);
+    for (const num of nums) {
+      const before = progress.votesInserted;
+      await processSenateVote(session, num, singleMap);
+      inserted += progress.votesInserted - before;
+      await sleep(DELAY_MS);
+    }
+  }
+
+  log(`  Done. Inserted ${inserted} votes for ${bioguideId}`);
+  const sync = require('./sync');
+  await sync.updatePoliticianStats(bioguideId);
+  return inserted;
+}
+
+module.exports = { rebuildVotes, syncSingleSenatorVotes, progress };
