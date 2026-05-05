@@ -117,6 +117,12 @@ const DOMAINS = {
  * Returns domain key or null if no match
  */
 function classifyVote(vote) {
+  // Nominations are personnel votes, not policy votes. Descriptions like
+  // "Jessica Kramer...EPA Assistant Administrator" match climate keywords
+  // but have nothing to do with climate policy.
+  const q = vote.question || '';
+  if (/\bnomination\b/i.test(q) || /\bPN\d/i.test(q)) return null;
+
   const searchText = [
     vote.description || '',
     vote.question || '',
