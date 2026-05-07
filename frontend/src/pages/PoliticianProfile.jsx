@@ -1,10 +1,29 @@
-import React, { useEffect, useState, useMemo } from 'react';
+import React, { useEffect, useState, useMemo, useRef } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import BiasBar from '../components/BiasBar';
 import Avatar from '../components/Avatar';
-import { getPolitician, getPoliticianVotes, triggerAnalysis, getErrorMessage, getConflicts, computeConflicts } from '../services/api';
+import { getPolitician, getPoliticianVotes, triggerAnalysis, getErrorMessage, getConflicts, computeConflicts, getSurvey } from '../services/api';
 import { findCandidateId, getCommitteeId, getTopEmployers } from '../services/fecClient';
 import { classifyVote, getDomain } from '../utils/domainClassifier';
+
+const SURVEY_TO_SUBJECT = {
+  healthcare:          'Health',
+  climate:             'Environmental',
+  immigration:         'Immigration',
+  gun_policy:          'Crime',
+  taxes:               'Taxation',
+  defense:             'Armed Forces',
+  reproductive_rights: 'Civil Rights',
+  education:           'Education',
+  safety_net:          'Finance',
+  criminal_justice:    'Crime',
+};
+
+function getTopIssueSubject(importance) {
+  if (!importance) return '';
+  const top = Object.entries(importance).sort((a, b) => b[1] - a[1])[0];
+  return top ? (SURVEY_TO_SUBJECT[top[0]] || '') : '';
+}
 
 const PC = { D: 'var(--party-d)', R: 'var(--party-r)', I: 'var(--party-i)' };
 const PD = { D: 'var(--party-d-dim)', R: 'var(--party-r-dim)', I: 'var(--party-i-dim)' };
@@ -28,6 +47,10 @@ export default function PoliticianProfile() {
   const [alignLoading,  setAlignLoading]  = useState(false);
   const [conflicts,     setConflicts]     = useState(null);
   const [conflictsLoading, setConflictsLoading] = useState(false);
+  // Vote history expand/collapse
+  const [votesExpanded,  setVotesExpanded]  = useState(false);
+  const [userSurvey,     setUserSurvey]     = useState(null);
+  const initialFilterSet = useRef(false);
   // Vote filters
   const [search,    setSearch]    = useState('');
   const [posFilter, setPosFilter] = useState('');
@@ -59,6 +82,7 @@ export default function PoliticianProfile() {
       // Fire after main data — non-blocking, polData must be in scope here
       loadAlignment();
       loadConflicts(polData);
+      loadUserSurvey();
     } catch (err) { setError(getErrorMessage(err)); }
     finally { setLoading(false); }
   }
@@ -102,6 +126,17 @@ export default function PoliticianProfile() {
     }
   }
 
+  async function loadUserSurvey() {
+    try {
+      const stored = localStorage.getItem('votemap_user');
+      if (!stored) return;
+      const user = JSON.parse(stored);
+      if (!user?.id) return;
+      const data = await getSurvey(user.id);
+      if (data?.importance) setUserSurvey(data);
+    } catch {}
+  }
+
   async function loadAlignment() {
     try {
       const stored = localStorage.getItem('votemap_user');
@@ -132,6 +167,15 @@ export default function PoliticianProfile() {
       if (result.analysis) { setAnalysis(result.analysis); setBiases(result.analysis.biases || []); }
     } catch {}
     setAnalyzing(false);
+  }
+
+  function handleShowVotes() {
+    setVotesExpanded(true);
+    if (!initialFilterSet.current && userSurvey?.importance) {
+      const topSubject = getTopIssueSubject(userSurvey.importance);
+      if (topSubject) { setSubFilter(topSubject); setVotePage(0); }
+      initialFilterSet.current = true;
+    }
   }
 
   // Filtered votes
@@ -210,81 +254,97 @@ export default function PoliticianProfile() {
       {/* Two column — collapses to single on mobile via .profile-grid CSS class */}
       <div className="profile-grid">
 
-        {/* LEFT: Vote history */}
+        {/* LEFT: Vote history (collapsed by default) */}
         <section>
-          <SectionLabel>Vote history · {allVotes.length} loaded · {filteredVotes.length} shown</SectionLabel>
-          <div style={{ background: 'var(--bg-2)', border: '1px solid var(--border)', borderRadius: 'var(--radius-lg)', overflow: 'hidden', boxShadow: 'var(--shadow)' }}>
-
-            {/* Filters toolbar */}
-            <div style={{ padding: '.75rem 1.25rem', borderBottom: '1px solid var(--border)', background: 'var(--bg)', display: 'flex', gap: '.5rem', flexWrap: 'wrap' }}>
-              <input
-                placeholder="Search bills…" value={search}
-                onChange={e => handleFilterChange(setSearch)(e.target.value)}
-                style={{ flex: 1, minWidth: 140, fontSize: 12, fontFamily: 'var(--font-mono)', border: '1px solid var(--border-med)', borderRadius: 'var(--radius)', padding: '5px 10px', background: 'var(--bg-2)', outline: 'none' }}
-              />
-              <select value={posFilter} onChange={e => handleFilterChange(setPosFilter)(e.target.value)} style={{ fontSize: 12, fontFamily: 'var(--font-mono)', border: '1px solid var(--border-med)', borderRadius: 'var(--radius)', padding: '5px 8px', background: 'var(--bg-2)', outline: 'none', cursor: 'pointer' }}>
-                <option value="">All votes</option>
-                <option value="Yes">YEA only</option>
-                <option value="No">NAY only</option>
-                <option value="Not Voting">Abstain only</option>
-              </select>
-              <select value={subFilter} onChange={e => handleFilterChange(setSubFilter)(e.target.value)} style={{ fontSize: 12, fontFamily: 'var(--font-mono)', border: '1px solid var(--border-med)', borderRadius: 'var(--radius)', padding: '5px 8px', background: 'var(--bg-2)', outline: 'none', cursor: 'pointer' }}>
-                {SUBJECTS.map(s => <option key={s} value={s}>{s || 'All subjects'}</option>)}
-              </select>
-            </div>
-
-            {/* Vote rows */}
-            {pagedVotes.length === 0 ? (
-              <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-3)', fontSize: 13 }}>No votes match your filter.</div>
-            ) : pagedVotes.map((vote, i) => (
-              <div key={vote.id || i} style={{
-                display: 'flex', alignItems: 'flex-start', gap: 10, padding: '10px 1.25rem',
-                borderBottom: '1px solid var(--border)', animation: `fadeIn 0.3s ease ${i * 0.02}s both`,
-              }}>
-                <span style={{
-                  fontSize: 10, fontFamily: 'var(--font-mono)', fontWeight: 500,
-                  padding: '3px 7px', borderRadius: 3, flexShrink: 0, minWidth: 34,
-                  textAlign: 'center', marginTop: 1,
-                  color: voteColor(vote.position), background: `${voteColor(vote.position)}18`,
-                }}>{voteShort(vote.position)}</span>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <p style={{ fontSize: 13, color: 'var(--text)', lineHeight: 1.4, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
-                    {vote.short_title || vote.title || vote.description || vote.question}
-                  </p>
-                  {(() => {
-                    const domainKey = classifyVote(vote);
-                    const d = domainKey ? getDomain(domainKey) : null;
-                    const label = d ? `${d.icon} ${d.label}` : vote.primary_subject;
-                    return label ? (
-                      <span style={{ fontSize: 10, fontFamily: 'var(--font-mono)', color: 'var(--text-3)', display: 'block', marginTop: 3 }}>{label}</span>
-                    ) : null;
-                  })()}
-                </div>
-                {vote.vote_date && (
-                  <span style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-3)', flexShrink: 0, whiteSpace: 'nowrap' }}>
-                    {new Date(vote.vote_date).toLocaleDateString('en-US', { month: 'short', year: 'numeric' })}
-                  </span>
-                )}
-              </div>
-            ))}
-
-            {/* Pagination */}
-            {totalPages > 1 && (
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '.75rem 1.25rem', borderTop: '1px solid var(--border)', background: 'var(--bg)' }}>
-                <button disabled={votePage === 0} onClick={() => setVotePage(p => p - 1)} style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-2)', border: '1px solid var(--border-med)', borderRadius: 'var(--radius)', padding: '5px 11px', transition: 'all var(--transition)', opacity: votePage === 0 ? .35 : 1 }}
-                  onMouseEnter={e=>{if(votePage>0){e.target.style.background='var(--text)';e.target.style.color='var(--bg-2)'}}}
-                  onMouseLeave={e=>{e.target.style.background='transparent';e.target.style.color='var(--text-2)'}}
-                >← Prev</button>
-                <span style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-3)' }}>
-                  {votePage * VOTES_PER_PAGE + 1}–{Math.min((votePage + 1) * VOTES_PER_PAGE, filteredVotes.length)} of {filteredVotes.length}
-                </span>
-                <button disabled={votePage >= totalPages - 1} onClick={() => setVotePage(p => p + 1)} style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-2)', border: '1px solid var(--border-med)', borderRadius: 'var(--radius)', padding: '5px 11px', transition: 'all var(--transition)', opacity: votePage >= totalPages - 1 ? .35 : 1 }}
-                  onMouseEnter={e=>{if(votePage<totalPages-1){e.target.style.background='var(--text)';e.target.style.color='var(--bg-2)'}}}
-                  onMouseLeave={e=>{e.target.style.background='transparent';e.target.style.color='var(--text-2)'}}
-                >Next →</button>
-              </div>
-            )}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '.75rem' }}>
+            <span style={{ fontSize: 10, fontFamily: 'var(--font-mono)', color: 'var(--text-3)', letterSpacing: '.12em', textTransform: 'uppercase', whiteSpace: 'nowrap' }}>
+              Vote history · {allVotes.length} total
+            </span>
+            <div style={{ flex: 1, height: 1, background: 'var(--border)' }} />
+            <button
+              onClick={votesExpanded ? () => setVotesExpanded(false) : handleShowVotes}
+              style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-2)', background: 'none', border: '1px solid var(--border-med)', borderRadius: 'var(--radius)', padding: '4px 11px', cursor: 'pointer', transition: 'all var(--transition)', whiteSpace: 'nowrap' }}
+              onMouseEnter={e => { e.currentTarget.style.background = 'var(--text)'; e.currentTarget.style.color = 'var(--bg-2)'; }}
+              onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'var(--text-2)'; }}
+            >
+              {votesExpanded ? 'Hide ↑' : 'Show votes ↓'}
+            </button>
           </div>
+
+          {votesExpanded && (
+            <div style={{ background: 'var(--bg-2)', border: '1px solid var(--border)', borderRadius: 'var(--radius-lg)', overflow: 'hidden', boxShadow: 'var(--shadow)' }}>
+
+              {/* Filters toolbar */}
+              <div style={{ padding: '.75rem 1.25rem', borderBottom: '1px solid var(--border)', background: 'var(--bg)', display: 'flex', gap: '.5rem', flexWrap: 'wrap' }}>
+                <input
+                  placeholder="Search bills…" value={search}
+                  onChange={e => handleFilterChange(setSearch)(e.target.value)}
+                  style={{ flex: 1, minWidth: 140, fontSize: 12, fontFamily: 'var(--font-mono)', border: '1px solid var(--border-med)', borderRadius: 'var(--radius)', padding: '5px 10px', background: 'var(--bg-2)', outline: 'none' }}
+                />
+                <select value={posFilter} onChange={e => handleFilterChange(setPosFilter)(e.target.value)} style={{ fontSize: 12, fontFamily: 'var(--font-mono)', border: '1px solid var(--border-med)', borderRadius: 'var(--radius)', padding: '5px 8px', background: 'var(--bg-2)', outline: 'none', cursor: 'pointer' }}>
+                  <option value="">All votes</option>
+                  <option value="Yes">YEA only</option>
+                  <option value="No">NAY only</option>
+                  <option value="Not Voting">Abstain only</option>
+                </select>
+                <select value={subFilter} onChange={e => handleFilterChange(setSubFilter)(e.target.value)} style={{ fontSize: 12, fontFamily: 'var(--font-mono)', border: '1px solid var(--border-med)', borderRadius: 'var(--radius)', padding: '5px 8px', background: 'var(--bg-2)', outline: 'none', cursor: 'pointer' }}>
+                  {SUBJECTS.map(s => <option key={s} value={s}>{s || 'All subjects'}</option>)}
+                </select>
+              </div>
+
+              {/* Vote rows */}
+              {pagedVotes.length === 0 ? (
+                <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-3)', fontSize: 13 }}>No votes match your filter.</div>
+              ) : pagedVotes.map((vote, i) => (
+                <div key={vote.id || i} style={{
+                  display: 'flex', alignItems: 'flex-start', gap: 10, padding: '10px 1.25rem',
+                  borderBottom: '1px solid var(--border)', animation: `fadeIn 0.3s ease ${i * 0.02}s both`,
+                }}>
+                  <span style={{
+                    fontSize: 10, fontFamily: 'var(--font-mono)', fontWeight: 500,
+                    padding: '3px 7px', borderRadius: 3, flexShrink: 0, minWidth: 34,
+                    textAlign: 'center', marginTop: 1,
+                    color: voteColor(vote.position), background: `${voteColor(vote.position)}18`,
+                  }}>{voteShort(vote.position)}</span>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <p style={{ fontSize: 13, color: 'var(--text)', lineHeight: 1.4, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
+                      {vote.short_title || vote.title || vote.description || vote.question}
+                    </p>
+                    {(() => {
+                      const domainKey = classifyVote(vote);
+                      const d = domainKey ? getDomain(domainKey) : null;
+                      const label = d ? `${d.icon} ${d.label}` : vote.primary_subject;
+                      return label ? (
+                        <span style={{ fontSize: 10, fontFamily: 'var(--font-mono)', color: 'var(--text-3)', display: 'block', marginTop: 3 }}>{label}</span>
+                      ) : null;
+                    })()}
+                  </div>
+                  {vote.vote_date && (
+                    <span style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-3)', flexShrink: 0, whiteSpace: 'nowrap' }}>
+                      {new Date(vote.vote_date).toLocaleDateString('en-US', { month: 'short', year: 'numeric' })}
+                    </span>
+                  )}
+                </div>
+              ))}
+
+              {/* Pagination */}
+              {totalPages > 1 && (
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '.75rem 1.25rem', borderTop: '1px solid var(--border)', background: 'var(--bg)' }}>
+                  <button disabled={votePage === 0} onClick={() => setVotePage(p => p - 1)} style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-2)', border: '1px solid var(--border-med)', borderRadius: 'var(--radius)', padding: '5px 11px', transition: 'all var(--transition)', opacity: votePage === 0 ? .35 : 1 }}
+                    onMouseEnter={e=>{if(votePage>0){e.target.style.background='var(--text)';e.target.style.color='var(--bg-2)'}}}
+                    onMouseLeave={e=>{e.target.style.background='transparent';e.target.style.color='var(--text-2)'}}
+                  >← Prev</button>
+                  <span style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-3)' }}>
+                    {votePage * VOTES_PER_PAGE + 1}–{Math.min((votePage + 1) * VOTES_PER_PAGE, filteredVotes.length)} of {filteredVotes.length}
+                  </span>
+                  <button disabled={votePage >= totalPages - 1} onClick={() => setVotePage(p => p + 1)} style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-2)', border: '1px solid var(--border-med)', borderRadius: 'var(--radius)', padding: '5px 11px', transition: 'all var(--transition)', opacity: votePage >= totalPages - 1 ? .35 : 1 }}
+                    onMouseEnter={e=>{if(votePage<totalPages-1){e.target.style.background='var(--text)';e.target.style.color='var(--bg-2)'}}}
+                    onMouseLeave={e=>{e.target.style.background='transparent';e.target.style.color='var(--text-2)'}}
+                  >Next →</button>
+                </div>
+              )}
+            </div>
+          )}
         </section>
 
         {/* RIGHT: Analysis */}
