@@ -48,8 +48,9 @@ export default function PoliticianProfile() {
   const [conflicts,     setConflicts]     = useState(null);
   const [conflictsLoading, setConflictsLoading] = useState(false);
   // Vote history expand/collapse
-  const [votesExpanded,  setVotesExpanded]  = useState(false);
-  const [userSurvey,     setUserSurvey]     = useState(null);
+  const [votesExpanded,      setVotesExpanded]      = useState(false);
+  const [userSurvey,         setUserSurvey]         = useState(null);
+  const [showAllAlignments,  setShowAllAlignments]  = useState(false);
   const initialFilterSet = useRef(false);
   // Vote filters
   const [search,    setSearch]    = useState('');
@@ -214,7 +215,7 @@ export default function PoliticianProfile() {
   const scoreColor = alignment?.score >= 70 ? 'var(--green)' : alignment?.score >= 45 ? 'var(--amber)' : 'var(--red)';
 
   return (
-    <main style={{ maxWidth: 980, margin: '0 auto', padding: '2.5rem 1.5rem 5rem' }}>
+    <main style={{ maxWidth: 740, margin: '0 auto', padding: '2.5rem 1.5rem 5rem' }}>
       <Link to="/reps" style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12, fontFamily: 'var(--font-mono)', color: 'var(--text-2)', marginBottom: '1.75rem', transition: 'color var(--transition)' }}
         onMouseEnter={e => e.currentTarget.style.color = 'var(--text)'}
         onMouseLeave={e => e.currentTarget.style.color = 'var(--text-2)'}
@@ -251,10 +252,232 @@ export default function PoliticianProfile() {
         </div>
       </header>
 
-      {/* Two column — collapses to single on mobile via .profile-grid CSS class */}
-      <div className="profile-grid">
+      {/* Single-column profile — ordered: match → conflicts → bias → votes */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
 
-        {/* LEFT: Vote history (collapsed by default) */}
+        {/* 1. MATCH SCORE + TOP 3 ALIGNMENTS */}
+        {(alignment || alignLoading) && (
+          <section>
+            <SectionLabel>Your match</SectionLabel>
+            <Panel title="How well do they represent you?">
+              <div style={{ padding: '1.25rem' }}>
+                {alignLoading ? (
+                  <p style={{ fontSize: 12, color: 'var(--text-3)', fontFamily: 'var(--font-mono)' }}>Calculating…</p>
+                ) : alignment?.score == null ? (
+                  <p style={{ fontSize: 13, color: 'var(--text-3)' }}>
+                    Complete the <Link to="/survey" style={{ color: 'var(--text-2)' }}>values survey</Link> to see your alignment score.
+                  </p>
+                ) : (() => {
+                  const validDomains = alignment.breakdown
+                    .filter(d => d.hasUserAnswer && d.agreementPct !== null)
+                    .sort((a, b) => {
+                      const ia = userSurvey?.importance?.[a.domain] || 0;
+                      const ib = userSurvey?.importance?.[b.domain] || 0;
+                      return ib !== ia ? ib - ia : b.voteCount - a.voteCount;
+                    });
+                  const topDomains  = validDomains.slice(0, 3);
+                  const restDomains = validDomains.slice(3);
+                  return (
+                    <>
+                      {/* Score + label */}
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '1.25rem', marginBottom: '1.5rem' }}>
+                        <div style={{
+                          width: 72, height: 72, borderRadius: '50%', flexShrink: 0,
+                          border: `3px solid ${scoreColor}`,
+                          display: 'flex', alignItems: 'center', justifyContent: 'center',
+                          fontFamily: 'var(--font-display)', fontSize: 24, fontWeight: 900,
+                          color: scoreColor,
+                        }}>{alignment.score}%</div>
+                        <div>
+                          <p style={{ fontSize: 17, color: 'var(--text)', fontWeight: 700, marginBottom: 4, fontFamily: 'var(--font-display)' }}>
+                            {alignment.score >= 70 ? 'Strong match' : alignment.score >= 45 ? 'Partial match' : 'Low match'}
+                          </p>
+                          <p style={{ fontSize: 12, color: 'var(--text-3)', fontFamily: 'var(--font-mono)' }}>
+                            Based on {alignment.issuesAnalyzed} issue{alignment.issuesAnalyzed !== 1 ? 's' : ''} · weighted by your priorities
+                          </p>
+                        </div>
+                      </div>
+
+                      {/* Top 3 issue alignments */}
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '.75rem', paddingTop: '1rem', borderTop: '1px solid var(--border)' }}>
+                        {topDomains.map(domain => {
+                          const pct   = domain.agreementPct;
+                          const color = pct >= 70 ? 'var(--green)' : pct >= 45 ? 'var(--amber)' : 'var(--red)';
+                          return (
+                            <div key={domain.domain}>
+                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 5 }}>
+                                <span style={{ fontSize: 13, color: 'var(--text-2)', fontWeight: 500 }}>
+                                  {domain.icon} {domain.label}
+                                </span>
+                                <span style={{ fontSize: 12, fontFamily: 'var(--font-mono)', color, fontWeight: 600 }}>
+                                  {pct}%
+                                </span>
+                              </div>
+                              <div style={{ height: 4, background: 'var(--bg-3)', borderRadius: 2, overflow: 'hidden' }}>
+                                <div style={{ height: '100%', width: `${pct}%`, background: color, borderRadius: 2, transition: 'width 0.6s ease' }} />
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+
+                      {/* Expand to show more */}
+                      {restDomains.length > 0 && (
+                        <>
+                          {showAllAlignments && (
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '.75rem', marginTop: '.75rem' }}>
+                              {restDomains.map(domain => {
+                                const pct   = domain.agreementPct;
+                                const color = pct >= 70 ? 'var(--green)' : pct >= 45 ? 'var(--amber)' : 'var(--red)';
+                                return (
+                                  <div key={domain.domain}>
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 5 }}>
+                                      <span style={{ fontSize: 13, color: 'var(--text-2)' }}>
+                                        {domain.icon} {domain.label}
+                                      </span>
+                                      <span style={{ fontSize: 12, fontFamily: 'var(--font-mono)', color, fontWeight: 600 }}>
+                                        {pct}%
+                                      </span>
+                                    </div>
+                                    <div style={{ height: 4, background: 'var(--bg-3)', borderRadius: 2, overflow: 'hidden' }}>
+                                      <div style={{ height: '100%', width: `${pct}%`, background: color, borderRadius: 2, transition: 'width 0.6s ease' }} />
+                                    </div>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          )}
+                          <button onClick={() => setShowAllAlignments(x => !x)} style={{
+                            marginTop: '.875rem', fontSize: 12, fontFamily: 'var(--font-mono)', color: 'var(--text-2)',
+                            background: 'none', border: 'none', cursor: 'pointer', padding: 0,
+                            transition: 'color var(--transition)',
+                          }}>
+                            {showAllAlignments ? `↑ Show top 3 only` : `↓ Show all ${validDomains.length} issues`}
+                          </button>
+                        </>
+                      )}
+                    </>
+                  );
+                })()}
+              </div>
+            </Panel>
+          </section>
+        )}
+
+        {/* 2. CONFLICTS OF INTEREST */}
+        {(conflictsLoading || conflicts !== null || corruptionBiases.length > 0) && (
+          <section>
+            <SectionLabel>Conflicts of interest</SectionLabel>
+            {(conflictsLoading || conflicts !== null) && (
+              <Panel title="⚑ Donor conflicts" titleColor="var(--gold)" headerBg="var(--gold-dim)">
+                <div style={{ padding: '.875rem 1.25rem' }}>
+                  {conflictsLoading ? (
+                    <p style={{ fontSize: 12, color: 'var(--text-3)', fontFamily: 'var(--font-mono)' }}>Loading FEC donor data…</p>
+                  ) : (
+                    <>
+                      <p style={{ fontSize: 12, color: 'var(--text-3)', fontFamily: 'var(--font-mono)', marginBottom: '1rem', lineHeight: 1.55 }}>
+                        Top donor industries cross-referenced with voting record. Flagged when a politician votes with a donor's interests in {'>'}80% of relevant votes.
+                      </p>
+                      {conflicts.conflicts.length === 0 ? (
+                        <p style={{ fontSize: 12, color: 'var(--text-3)', fontFamily: 'var(--font-mono)', fontStyle: 'italic' }}>
+                          No high-threshold voting conflicts detected with top donor industries.
+                        </p>
+                      ) : conflicts.conflicts.map((c, i) => {
+                        const d   = getDomain(c.domain);
+                        const pct = c.vote_alignment_pct;
+                        return (
+                          <div key={i} style={{
+                            paddingBottom: i < conflicts.conflicts.length - 1 ? '.875rem' : 0,
+                            marginBottom:  i < conflicts.conflicts.length - 1 ? '.875rem' : 0,
+                            borderBottom:  i < conflicts.conflicts.length - 1 ? '1px solid var(--border)' : 'none',
+                          }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 4 }}>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                                <span style={{ fontSize: 13, color: 'var(--text)', fontWeight: 500 }}>{d?.icon} {c.industry}</span>
+                                <span style={{ fontSize: 9, fontFamily: 'var(--font-mono)', padding: '2px 7px', borderRadius: 3, letterSpacing: '.06em', textTransform: 'uppercase', background: 'var(--gold-dim)', color: 'var(--gold)' }}>⚑ FEC</span>
+                              </div>
+                              <span style={{ fontSize: 13, fontFamily: 'var(--font-mono)', fontWeight: 500, color: 'var(--gold)', flexShrink: 0 }}>{pct}%</span>
+                            </div>
+                            <div style={{ height: 3, background: 'var(--bg-3)', borderRadius: 2, overflow: 'hidden', marginBottom: 5 }}>
+                              <div style={{ height: '100%', width: `${pct}%`, background: 'var(--gold)', borderRadius: 2, transition: 'width 0.9s cubic-bezier(0.16, 1, 0.3, 1)' }} />
+                            </div>
+                            <p style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-3)', lineHeight: 1.5 }}>
+                              ${c.donor_amount.toLocaleString()} from {c.donor_org} · voted against {d?.label?.toLowerCase() || c.domain} reform in {pct}% of {c.vote_count} votes
+                            </p>
+                          </div>
+                        );
+                      })}
+                      {conflicts.topDonors?.length > 0 && (
+                        <div style={{ marginTop: '1.25rem', paddingTop: '1rem', borderTop: '1px solid var(--border)' }}>
+                          <p style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-3)', marginBottom: '.5rem', textTransform: 'uppercase', letterSpacing: '.06em' }}>
+                            Top donor employers (2022–2024)
+                          </p>
+                          {conflicts.topDonors.map((d, i) => (
+                            <div key={i} style={{ display: 'flex', justifyContent: 'space-between', padding: '3px 0', fontSize: 12, fontFamily: 'var(--font-mono)' }}>
+                              <span style={{ color: 'var(--text-2)' }}>{d.employer}</span>
+                              <span style={{ color: 'var(--text-3)' }}>${d.total.toLocaleString()}</span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </>
+                  )}
+                </div>
+              </Panel>
+            )}
+            {corruptionBiases.length > 0 && (
+              <Panel title="⚑ Lobbying & industry alignment" titleColor="var(--gold)" headerBg="var(--gold-dim)">
+                <div style={{ padding: '.875rem 1.25rem 0' }}>
+                  <p style={{ fontSize: 12, color: 'var(--text-3)', fontFamily: 'var(--font-mono)', marginBottom: '.875rem', lineHeight: 1.5 }}>
+                    Correlation between voting record and major industry donor positions.
+                  </p>
+                  {corruptionBiases.map((b, i) => <BiasBar key={b.category} bias={b} delay={i * 0.05} />)}
+                </div>
+              </Panel>
+            )}
+          </section>
+        )}
+
+        {/* 3. BIAS ANALYSIS */}
+        <section>
+          <SectionLabel>Bias analysis</SectionLabel>
+          <Panel title="Issue positions">
+            <div style={{ padding: '1.125rem 1.25rem 0' }}>
+              {(analysis?.overall_summary || pol.ai_analysis?.overall_summary) && (
+                <p style={{ fontSize: 13, color: 'var(--text-2)', lineHeight: 1.65, marginBottom: '1rem', paddingBottom: '1rem', borderBottom: '1px solid var(--border)' }}>
+                  {analysis?.overall_summary || pol.ai_analysis?.overall_summary}
+                </p>
+              )}
+              {standardBiases.length > 0
+                ? standardBiases.map((b, i) => <BiasBar key={b.category} bias={b} delay={i * 0.05} />)
+                : <AnalysisPrompt totalVotes={pol.total_votes} analyzing={analyzing} onRun={runAnalysis} />
+              }
+            </div>
+          </Panel>
+          {foreignBiases.length > 0 && (
+            <Panel title="◈ Foreign influence indicators" titleColor="var(--orange)" headerBg="var(--orange-dim)">
+              <div style={{ padding: '.875rem 1.25rem 0' }}>
+                <p style={{ fontSize: 12, color: 'var(--text-3)', fontFamily: 'var(--font-mono)', marginBottom: '.875rem', lineHeight: 1.5 }}>
+                  Voting alignment with positions benefiting specific foreign governments.
+                </p>
+                {foreignBiases.map((b, i) => <BiasBar key={b.category} bias={b} delay={i * 0.05} />)}
+              </div>
+            </Panel>
+          )}
+          {biases.length > 0 && (
+            <div style={{ marginTop: '.625rem' }}>
+              <button onClick={runAnalysis} disabled={analyzing} style={{
+                fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-2)',
+                border: '1px solid var(--border-med)', borderRadius: 'var(--radius)',
+                padding: '7px 13px', transition: 'all var(--transition)', opacity: analyzing ? .5 : 1, cursor: 'pointer',
+              }}>
+                {analyzing ? '◌ Re-analyzing…' : '↺ Refresh analysis'}
+              </button>
+            </div>
+          )}
+        </section>
+
+        {/* 4. VOTE HISTORY (collapsed by default) */}
         <section>
           <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '.75rem' }}>
             <span style={{ fontSize: 10, fontFamily: 'var(--font-mono)', color: 'var(--text-3)', letterSpacing: '.12em', textTransform: 'uppercase', whiteSpace: 'nowrap' }}>
@@ -273,8 +496,6 @@ export default function PoliticianProfile() {
 
           {votesExpanded && (
             <div style={{ background: 'var(--bg-2)', border: '1px solid var(--border)', borderRadius: 'var(--radius-lg)', overflow: 'hidden', boxShadow: 'var(--shadow)' }}>
-
-              {/* Filters toolbar */}
               <div style={{ padding: '.75rem 1.25rem', borderBottom: '1px solid var(--border)', background: 'var(--bg)', display: 'flex', gap: '.5rem', flexWrap: 'wrap' }}>
                 <input
                   placeholder="Search bills…" value={search}
@@ -291,8 +512,6 @@ export default function PoliticianProfile() {
                   {SUBJECTS.map(s => <option key={s} value={s}>{s || 'All subjects'}</option>)}
                 </select>
               </div>
-
-              {/* Vote rows */}
               {pagedVotes.length === 0 ? (
                 <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-3)', fontSize: 13 }}>No votes match your filter.</div>
               ) : pagedVotes.map((vote, i) => (
@@ -326,8 +545,6 @@ export default function PoliticianProfile() {
                   )}
                 </div>
               ))}
-
-              {/* Pagination */}
               {totalPages > 1 && (
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '.75rem 1.25rem', borderTop: '1px solid var(--border)', background: 'var(--bg)' }}>
                   <button disabled={votePage === 0} onClick={() => setVotePage(p => p - 1)} style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-2)', border: '1px solid var(--border-med)', borderRadius: 'var(--radius)', padding: '5px 11px', transition: 'all var(--transition)', opacity: votePage === 0 ? .35 : 1 }}
@@ -344,230 +561,6 @@ export default function PoliticianProfile() {
                 </div>
               )}
             </div>
-          )}
-        </section>
-
-        {/* RIGHT: Analysis */}
-        <section style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-
-          {/* YOUR ALIGNMENT — shown if logged in */}
-          {(alignment || alignLoading) && (
-            <>
-              <SectionLabel>Your alignment</SectionLabel>
-              <Panel title="How well do they represent you?">
-                <div style={{ padding: '1.125rem 1.25rem' }}>
-                  {alignLoading ? (
-                    <p style={{ fontSize: 12, color: 'var(--text-3)', fontFamily: 'var(--font-mono)' }}>Calculating…</p>
-                  ) : alignment?.score == null ? (
-                    <p style={{ fontSize: 13, color: 'var(--text-3)' }}>
-                      Complete the <Link to="/survey" style={{ color: 'var(--text-2)' }}>values survey</Link> to see your alignment score.
-                    </p>
-                  ) : (
-                    <>
-                      {/* Overall score */}
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '1.25rem', paddingBottom: '1rem', borderBottom: '1px solid var(--border)' }}>
-                        <div style={{
-                          width: 56, height: 56, borderRadius: '50%', flexShrink: 0,
-                          border: `2px solid ${scoreColor}`,
-                          display: 'flex', alignItems: 'center', justifyContent: 'center',
-                          fontFamily: 'var(--font-display)', fontSize: 20, fontWeight: 900,
-                          color: scoreColor,
-                        }}>{alignment.score}%</div>
-                        <div>
-                          <p style={{ fontSize: 13, color: 'var(--text)', fontWeight: 600, marginBottom: 2 }}>
-                            {alignment.score >= 70 ? 'Strong match' : alignment.score >= 45 ? 'Partial match' : 'Low match'}
-                          </p>
-                          <p style={{ fontSize: 11, color: 'var(--text-3)', fontFamily: 'var(--font-mono)' }}>
-                            Based on {alignment.issuesAnalyzed} issue{alignment.issuesAnalyzed !== 1 ? 's' : ''}
-                          </p>
-                        </div>
-                      </div>
-
-                      {/* Per-domain breakdown */}
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '.625rem' }}>
-                        {alignment.breakdown
-                          .filter(d => d.hasUserAnswer && d.agreementPct !== null)
-                          .map(domain => {
-                            const pct = domain.agreementPct;
-                            const color = pct >= 70 ? 'var(--green)' : pct >= 45 ? 'var(--amber)' : 'var(--red)';
-                            return (
-                              <div key={domain.domain}>
-                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
-                                  <span style={{ fontSize: 12, color: 'var(--text-2)' }}>
-                                    {domain.icon} {domain.label}
-                                  </span>
-                                  <span style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color, fontWeight: 600 }}>
-                                    {pct}%
-                                  </span>
-                                </div>
-                                <div style={{ height: 3, background: 'var(--bg-3)', borderRadius: 2, overflow: 'hidden' }}>
-                                  <div style={{
-                                    height: '100%', width: `${pct}%`,
-                                    background: color,
-                                    borderRadius: 2,
-                                    transition: 'width 0.6s ease',
-                                  }} />
-                                </div>
-                                <p style={{ fontSize: 10, fontFamily: 'var(--font-mono)', color: 'var(--text-3)', marginTop: 2 }}>
-                                  {domain.voteCount} votes analyzed
-                                </p>
-                              </div>
-                            );
-                          })}
-                      </div>
-                    </>
-                  )}
-                </div>
-              </Panel>
-            </>
-          )}
-
-          {/* Standard biases */}
-          <SectionLabel>Voting pattern analysis</SectionLabel>
-          <Panel title="Issue positions">
-            <div style={{ padding: '1.125rem 1.25rem 0' }}>
-              {(analysis?.overall_summary || pol.ai_analysis?.overall_summary) && (
-                <p style={{ fontSize: 13, color: 'var(--text-2)', lineHeight: 1.65, marginBottom: '1rem', paddingBottom: '1rem', borderBottom: '1px solid var(--border)' }}>
-                  {analysis?.overall_summary || pol.ai_analysis?.overall_summary}
-                </p>
-              )}
-              {standardBiases.length > 0
-                ? standardBiases.map((b, i) => <BiasBar key={b.category} bias={b} delay={i * 0.05} />)
-                : <AnalysisPrompt totalVotes={pol.total_votes} analyzing={analyzing} onRun={runAnalysis} />
-              }
-            </div>
-          </Panel>
-
-          {/* Corruption */}
-          {corruptionBiases.length > 0 && (
-            <Panel title="⚑ Lobbying & corruption indicators" titleColor="var(--gold)" headerBg="var(--gold-dim)">
-              <div style={{ padding: '.875rem 1.25rem 0' }}>
-                <p style={{ fontSize: 12, color: 'var(--text-3)', fontFamily: 'var(--font-mono)', marginBottom: '.875rem', lineHeight: 1.5 }}>
-                  Correlation between voting record and major industry donor positions.
-                </p>
-                {corruptionBiases.map((b, i) => <BiasBar key={b.category} bias={b} delay={i * 0.05} />)}
-              </div>
-            </Panel>
-          )}
-
-          {/* FEC Conflicts of Interest */}
-          {(conflictsLoading || conflicts !== null) && (
-            <Panel title="⚑ Conflicts of interest" titleColor="var(--gold)" headerBg="var(--gold-dim)">
-              <div style={{ padding: '.875rem 1.25rem' }}>
-                {conflictsLoading ? (
-                  <p style={{ fontSize: 12, color: 'var(--text-3)', fontFamily: 'var(--font-mono)' }}>Loading FEC donor data…</p>
-                ) : (
-                  <>
-                    <p style={{ fontSize: 12, color: 'var(--text-3)', fontFamily: 'var(--font-mono)', marginBottom: '1rem', lineHeight: 1.55 }}>
-                      Top donor industries cross-referenced with voting record. Flagged when a politician votes with a donor industry's interests in {'>'}80% of relevant votes.
-                    </p>
-
-                    {conflicts.conflicts.length === 0 ? (
-                      <p style={{ fontSize: 12, color: 'var(--text-3)', fontFamily: 'var(--font-mono)', fontStyle: 'italic' }}>
-                        No high-threshold voting conflicts detected with top donor industries.
-                      </p>
-                    ) : conflicts.conflicts.map((c, i) => {
-                      const d = getDomain(c.domain);
-                      const pct = c.vote_alignment_pct;
-                      return (
-                        <div key={i} style={{
-                          paddingBottom: i < conflicts.conflicts.length - 1 ? '.875rem' : 0,
-                          marginBottom:  i < conflicts.conflicts.length - 1 ? '.875rem' : 0,
-                          borderBottom:  i < conflicts.conflicts.length - 1 ? '1px solid var(--border)' : 'none',
-                        }}>
-                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 4 }}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-                              <span style={{ fontSize: 13, color: 'var(--text)', fontWeight: 500 }}>
-                                {d?.icon} {c.industry}
-                              </span>
-                              <span style={{
-                                fontSize: 9, fontFamily: 'var(--font-mono)', padding: '2px 7px',
-                                borderRadius: 3, letterSpacing: '.06em', textTransform: 'uppercase',
-                                background: 'var(--gold-dim)', color: 'var(--gold)',
-                              }}>⚑ FEC</span>
-                            </div>
-                            <span style={{ fontSize: 13, fontFamily: 'var(--font-mono)', fontWeight: 500, color: 'var(--gold)', flexShrink: 0 }}>
-                              {pct}%
-                            </span>
-                          </div>
-                          <div style={{ height: 3, background: 'var(--bg-3)', borderRadius: 2, overflow: 'hidden', marginBottom: 5 }}>
-                            <div style={{
-                              height: '100%', width: `${pct}%`,
-                              background: 'var(--gold)', borderRadius: 2,
-                              transition: 'width 0.9s cubic-bezier(0.16, 1, 0.3, 1)',
-                            }} />
-                          </div>
-                          <p style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-3)', lineHeight: 1.5 }}>
-                            ${c.donor_amount.toLocaleString()} from {c.donor_org} · voted against {d?.label?.toLowerCase() || c.domain} reform in {pct}% of {c.vote_count} votes
-                          </p>
-                        </div>
-                      );
-                    })}
-
-                    {conflicts.topDonors?.length > 0 && (
-                      <div style={{ marginTop: '1.25rem', paddingTop: '1rem', borderTop: '1px solid var(--border)' }}>
-                        <p style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-3)', marginBottom: '.5rem', textTransform: 'uppercase', letterSpacing: '.06em' }}>
-                          Top donor employers (2022–2024)
-                        </p>
-                        {conflicts.topDonors.map((d, i) => (
-                          <div key={i} style={{ display: 'flex', justifyContent: 'space-between', padding: '3px 0', fontSize: 12, fontFamily: 'var(--font-mono)' }}>
-                            <span style={{ color: 'var(--text-2)' }}>{d.employer}</span>
-                            <span style={{ color: 'var(--text-3)' }}>${d.total.toLocaleString()}</span>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </>
-                )}
-              </div>
-            </Panel>
-          )}
-
-          {/* Foreign influence */}
-          {foreignBiases.length > 0 && (
-            <Panel title="◈ Foreign influence indicators" titleColor="var(--orange)" headerBg="var(--orange-dim)">
-              <div style={{ padding: '.875rem 1.25rem 0' }}>
-                <p style={{ fontSize: 12, color: 'var(--text-3)', fontFamily: 'var(--font-mono)', marginBottom: '.875rem', lineHeight: 1.5 }}>
-                  Voting alignment with positions benefiting specific foreign governments.
-                </p>
-                {foreignBiases.map((b, i) => <BiasBar key={b.category} bias={b} delay={i * 0.05} />)}
-              </div>
-            </Panel>
-          )}
-
-          {/* Run/refresh analysis button */}
-          {biases.length > 0 && (
-            <button onClick={runAnalysis} disabled={analyzing} style={{
-              fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-2)',
-              border: '1px solid var(--border-med)', borderRadius: 'var(--radius)',
-              padding: '8px 14px', transition: 'all var(--transition)', opacity: analyzing ? .5 : 1,
-              alignSelf: 'flex-start',
-            }}>
-              {analyzing ? '◌ Re-analyzing…' : '↺ Refresh analysis'}
-            </button>
-          )}
-
-          {/* Ideology meter */}
-          {dw != null && (
-            <Panel title="DW-NOMINATE ideology score">
-              <div style={{ padding: '1.125rem 1.25rem' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, fontFamily: 'var(--font-mono)', marginBottom: 6 }}>
-                  <span style={{ color: 'var(--blue)' }}>← Liberal</span>
-                  <span style={{ color: 'var(--text-3)' }}>Political science metric</span>
-                  <span style={{ color: 'var(--red)' }}>Conservative →</span>
-                </div>
-                <div style={{ height: 4, background: 'var(--bg-3)', borderRadius: 2, position: 'relative', marginBottom: '.5rem' }}>
-                  <div style={{ position: 'absolute', left: '50%', top: -3, width: 1, height: 10, background: 'var(--border-med)' }} />
-                  <div style={{ position: 'absolute', top: '50%', left: `${dwPct}%`, transform: 'translate(-50%,-50%)', width: 11, height: 11, borderRadius: '50%', background: dwColor, border: '2px solid var(--bg-2)', boxShadow: 'var(--shadow)' }} />
-                </div>
-                <div style={{ textAlign: 'center', fontSize: 14, fontFamily: 'var(--font-mono)', fontWeight: 500, color: dwColor, marginTop: '.5rem' }}>
-                  {dw > 0 ? '+' : ''}{dw.toFixed(2)}
-                </div>
-                <p style={{ fontSize: 11, color: 'var(--text-3)', marginTop: '.625rem', lineHeight: 1.5 }}>
-                  Based on lifetime voting record. −1.0 = most liberal, +1.0 = most conservative.
-                </p>
-              </div>
-            </Panel>
           )}
         </section>
       </div>
