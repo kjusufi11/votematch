@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import RepresentativeCard from '../components/RepresentativeCard';
-import { getAlignment } from '../services/api';
+import { getAlignment, getSurvey } from '../services/api';
 import { useAuth } from '../contexts/AuthContext';
 
 export default function MyReps() {
@@ -9,6 +9,7 @@ export default function MyReps() {
   const { user } = useAuth();
   const [data, setData] = useState(null);
   const [alignment, setAlignment] = useState({});
+  const [surveyImportance, setSurveyImportance] = useState(undefined);
 
   useEffect(() => {
     const stored = sessionStorage.getItem('votemap_lookup');
@@ -25,6 +26,14 @@ export default function MyReps() {
     if (ids.length === 0) return;
     getAlignment(user.id, ids).then(setAlignment).catch(() => {});
   }, [data, user]);
+
+  // Load user survey importance for personalized rep cards
+  useEffect(() => {
+    if (!user) { setSurveyImportance(null); return; }
+    getSurvey(user.id)
+      .then(d => setSurveyImportance(d?.importance || {}))
+      .catch(() => setSurveyImportance({}));
+  }, [user]);
 
   if (!data) return <LoadingState />;
 
@@ -78,14 +87,14 @@ export default function MyReps() {
       {federal.length > 0 && (
         <section style={{ marginBottom: '2.5rem' }}>
           <SectionLabel>Federal — U.S. Congress</SectionLabel>
-          {federal.map((rep, i) => <RepresentativeCard key={rep.bioguideId || rep.name} rep={rep} index={i} alignment={alignment[rep.bioguideId]} />)}
+          {federal.map((rep, i) => <RepresentativeCard key={rep.bioguideId || rep.name} rep={rep} index={i} alignment={alignment[rep.bioguideId]} surveyImportance={surveyImportance} />)}
         </section>
       )}
 
       {stateReps.length > 0 && (
         <section>
           <SectionLabel>State Legislature</SectionLabel>
-          {stateReps.map((rep, i) => <RepresentativeCard key={rep.name} rep={rep} index={federal.length + i} />)}
+          {stateReps.map((rep, i) => <RepresentativeCard key={rep.name} rep={rep} index={federal.length + i} surveyImportance={surveyImportance} />)}
         </section>
       )}
 
