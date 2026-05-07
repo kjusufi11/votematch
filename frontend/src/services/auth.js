@@ -3,7 +3,7 @@
 
 import axios from 'axios';
 
-const BASE_URL = import.meta.env.VITE_API_URL || '/api';
+const BASE_URL = import.meta.env.VITE_API_URL || 'https://votemap-production.up.railway.app/api';
 const TOKEN_KEY = 'votemap_token';
 const USER_KEY  = 'votemap_user';
 
