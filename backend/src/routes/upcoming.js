@@ -88,31 +88,26 @@ router.get('/', async (req, res) => {
 
     if (subjectSet.size > 0) {
       const subjects = Array.from(subjectSet);
+      // Bills table populated from senate/house clerk feeds; no date linkage to votes.
+      // Order by id DESC (IDs are sequential, higher = more recently inserted roll call).
       const billsResult = await db.query(`
-        SELECT b.id, b.bill_id, b.number, b.title, b.short_title, b.primary_subject,
-               b.categories, b.introduced_date, b.last_vote_date, b.status, b.congress,
-               MAX(v.vote_date) AS latest_vote_date
-        FROM bills b
-        JOIN votes v ON v.bill_id = b.id
-        WHERE b.primary_subject = ANY($1)
-        GROUP BY b.id
-        ORDER BY MAX(v.vote_date) DESC NULLS LAST
+        SELECT DISTINCT ON (title) id, bill_id, number, title, short_title,
+               primary_subject, categories, introduced_date, last_vote_date, status, congress
+        FROM bills
+        WHERE primary_subject = ANY($1)
+        ORDER BY title, id DESC
         LIMIT 30
       `, [subjects]);
-      bills = billsResult.rows.map(r => ({ ...r, last_vote_date: r.last_vote_date || r.latest_vote_date }));
+      bills = billsResult.rows;
     } else {
-      // No priorities — show most recently voted-on bills
       const billsResult = await db.query(`
-        SELECT b.id, b.bill_id, b.number, b.title, b.short_title, b.primary_subject,
-               b.categories, b.introduced_date, b.last_vote_date, b.status, b.congress,
-               MAX(v.vote_date) AS latest_vote_date
-        FROM bills b
-        JOIN votes v ON v.bill_id = b.id
-        GROUP BY b.id
-        ORDER BY MAX(v.vote_date) DESC NULLS LAST
+        SELECT DISTINCT ON (title) id, bill_id, number, title, short_title,
+               primary_subject, categories, introduced_date, last_vote_date, status, congress
+        FROM bills
+        ORDER BY title, id DESC
         LIMIT 30
       `);
-      bills = billsResult.rows.map(r => ({ ...r, last_vote_date: r.last_vote_date || r.latest_vote_date }));
+      bills = billsResult.rows;
     }
 
     res.json({
