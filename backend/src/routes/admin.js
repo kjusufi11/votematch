@@ -86,6 +86,40 @@ router.post('/sync-members', async (req, res) => {
   res.json({ started: true, message: 'Member sync started in background. next_election will be populated from Congress.gov term data.' });
 });
 
+// GET /api/admin/debug-member?id=B001230
+// Shows raw Congress.gov data for one member so we can verify term structure.
+router.get('/debug-member', async (req, res) => {
+  const congress = require('../services/congress');
+  const id = req.query.id || 'C001098'; // Ted Cruz as default
+  try {
+    const member = await congress.getMember(id);
+    res.json({ raw: member, normalized: congress.normalizeMember(member) });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// GET /api/admin/debug-member-list
+// Shows raw Congress.gov data for the first 2 senators from the bulk list.
+router.get('/debug-member-list', async (req, res) => {
+  const congress = require('../services/congress');
+  try {
+    const members = await congress.getMembers(congress.CURRENT_CONGRESS, 'senate');
+    const sample = members.slice(0, 2);
+    res.json({
+      count: members.length,
+      sample: sample.map(m => ({
+        bioguideId: m.bioguideId,
+        name: m.name || m.directOrderName,
+        terms_raw: m.terms,
+        normalized: congress.normalizeMember(m),
+      })),
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // GET /api/admin/election-summary
 // Shows the current next_election breakdown in the DB.
 router.get('/election-summary', async (req, res) => {
