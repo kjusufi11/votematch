@@ -17,7 +17,10 @@ const DOMAINS = {
     keywords: [
       'climate', 'environment', 'clean energy', 'renewable', 'epa', 'carbon',
       'emission', 'green', 'solar', 'wind energy', 'fossil fuel', 'pollution',
-      'paris agreement', 'clean air', 'clean water', 'conservation', 'drilling'
+      'paris agreement', 'clean air', 'clean water', 'conservation', 'drilling',
+      // ProPublica/Congress.gov primary_subject values
+      'energy', 'natural resources', 'oil and gas', 'petroleum', 'keystone',
+      'offshore', 'arctic refuge', 'public lands',
     ],
   },
   economy: {
@@ -27,7 +30,9 @@ const DOMAINS = {
       'tax', 'revenue', 'irs', 'budget reconcil', 'fiscal', 'deficit',
       'debt ceiling', 'economic', 'trade', 'tariff', 'inflation', 'gdp',
       'minimum wage', 'labor', 'jobs', 'unemployment', 'small business',
-      'wall street', 'banking', 'financial regulation', 'federal reserve'
+      'wall street', 'banking', 'financial regulation', 'federal reserve',
+      // ProPublica/Congress.gov primary_subject values
+      'dodd-frank', 'consumer financial', 'securities regulation',
     ],
   },
   immigration: {

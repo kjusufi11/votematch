@@ -410,15 +410,20 @@ export default function PoliticianProfile() {
                   ) : (
                     <>
                       <p style={{ fontSize: 12, color: 'var(--text-3)', fontFamily: 'var(--font-mono)', marginBottom: '1rem', lineHeight: 1.55 }}>
-                        Top donor industries cross-referenced with voting record. Flagged when a politician votes with a donor's interests in {'>'}80% of relevant votes.
+                        Top donor industries cross-referenced with voting record. Shown when a donor sector has contributed and the politician's votes systematically favor that industry.
                       </p>
                       {conflicts.conflicts.length === 0 ? (
                         <p style={{ fontSize: 12, color: 'var(--text-3)', fontFamily: 'var(--font-mono)', fontStyle: 'italic' }}>
-                          No high-threshold voting conflicts detected with top donor industries.
+                          {conflicts.topDonors?.length > 0
+                            ? 'Donor data loaded — no voting conflicts detected above threshold with these industries.'
+                            : 'FEC donor data unavailable for this politician.'}
                         </p>
                       ) : conflicts.conflicts.map((c, i) => {
                         const d   = getDomain(c.domain);
                         const pct = c.vote_alignment_pct;
+                        const amt = c.donor_amount >= 1_000_000
+                          ? `$${(c.donor_amount / 1_000_000).toFixed(1)}M`
+                          : `$${(c.donor_amount / 1000).toFixed(0)}K`;
                         return (
                           <div key={i} style={{
                             paddingBottom: i < conflicts.conflicts.length - 1 ? '.875rem' : 0,
@@ -436,7 +441,7 @@ export default function PoliticianProfile() {
                               <div style={{ height: '100%', width: `${pct}%`, background: 'var(--gold)', borderRadius: 2, transition: 'width 0.9s cubic-bezier(0.16, 1, 0.3, 1)' }} />
                             </div>
                             <p style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-3)', lineHeight: 1.5 }}>
-                              ${c.donor_amount.toLocaleString()} from {c.donor_org} · voted against {d?.label?.toLowerCase() || c.domain} reform in {pct}% of {c.vote_count} votes
+                              {c.industry} donated {amt} · voted against {d?.label?.toLowerCase() || c.domain} {pct}% of the time ({c.vote_count} votes)
                             </p>
                           </div>
                         );

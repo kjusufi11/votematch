@@ -9,9 +9,9 @@
 const db = require('../db');
 const { classifyVote, effectivePosition } = require('./domainClassifier');
 
-const MIN_DONATION       = 10000;
-const MIN_VOTES          = 5;
-const CONFLICT_THRESHOLD = 80;
+const MIN_DONATION       = 500;
+const MIN_VOTES          = 2;
+const CONFLICT_THRESHOLD = 50;
 const CACHE_DAYS         = 7;
 
 const SECTOR_MAP = [
@@ -19,9 +19,29 @@ const SECTOR_MAP = [
     industry: 'Oil, Gas & Coal',
     domain: 'climate',
     keywords: [
-      'oil', 'gas', 'petroleum', 'exxon', 'chevron', 'conoco', 'shell', 'mobil',
-      'fossil fuel', 'pipeline', 'refin', 'coal', 'peabody', 'arch coal',
-      'halliburton', 'schlumberger', 'marathon', 'valero', 'phillips 66',
+      // Generic terms
+      'oil', 'petroleum', 'fossil fuel', 'coal', 'refin', 'natural gas', 'lng',
+      'midstream', 'oilfield', 'frack', 'shale', 'pipeline',
+      // Major integrated companies
+      'exxon', 'chevron', 'conoco', 'conocophillips', 'shell', 'mobil', 'bp ',
+      'total energies', 'equinor', 'eni ',
+      // US independents (esp. TX/OK/WY)
+      'pioneer natural', 'occidental', 'devon energy', 'apache corp', 'apa corp',
+      'coterra', 'diamondback', 'ovintiv', 'encana', 'callon petroleum',
+      'continental resources', 'range resources', 'southwestern energy',
+      'antero resources', 'cabot oil', 'sm energy', 'civitas', 'denbury',
+      'laramie', 'whiting petroleum', 'oasis petroleum', 'laredo petroleum',
+      // Oilfield services
+      'halliburton', 'schlumberger', 'slb ', 'baker hughes', 'weatherford',
+      'archrock', 'newpark', 'cactus inc', 'patterson-uti', 'nabors',
+      // Pipelines & midstream
+      'enterprise products', 'energy transfer', 'kinder morgan', 'oneok',
+      'williams companies', 'targa resources', 'magellan midstream', 'plains all',
+      // Refining & marketing
+      'valero', 'phillips 66', 'marathon', 'sunoco', 'hf sinclair', 'holly frontier',
+      'par pacific', 'pbf energy',
+      // Coal
+      'peabody', 'arch coal', 'consol energy', 'foresight energy', 'alpha natural',
     ],
   },
   {
@@ -30,6 +50,8 @@ const SECTOR_MAP = [
     keywords: [
       'lockheed', 'raytheon', 'boeing', 'northrop', 'general dynamics', 'l3harris',
       'bae systems', 'huntington ingalls', 'leidos', 'saic', 'booz allen', 'textron',
+      'general atomics', 'sierra nevada', 'caci ', 'mpri ', 'drs technologies',
+      'orbital sciences', 'aerojet', 'heico', 'transdigm',
     ],
   },
   {
@@ -39,6 +61,8 @@ const SECTOR_MAP = [
       'pharma', 'pfizer', 'merck', 'abbvie', 'johnson &', 'eli lilly', 'bristol',
       'novartis', 'amgen', 'biogen', 'gilead', 'astrazeneca', 'genentech', 'sanofi',
       'regeneron', 'moderna', 'bayer', 'biotechnology', 'biopharmaceutical',
+      'allergan', 'celgene', 'mylan', 'teva ', 'viatris', 'bausch', 'shire',
+      'alexion', 'vertex pharma', 'incyte',
     ],
   },
   {
@@ -46,17 +70,30 @@ const SECTOR_MAP = [
     domain: 'healthcare',
     keywords: [
       'unitedhealth', 'anthem', 'cigna', 'aetna', 'humana', 'centene', 'molina',
-      'managed care', 'wellpoint',
+      'managed care', 'wellpoint', 'elevance', 'bcbs', 'blue cross', 'blue shield',
+      'carefirst', 'health net', 'oscar health',
     ],
   },
   {
     industry: 'Finance & Banking',
     domain: 'economy',
     keywords: [
+      // Major banks & brokerages
       'goldman sachs', 'jpmorgan', 'jp morgan', 'morgan stanley', 'wells fargo',
-      'citigroup', 'citibank', 'bank of america', 'blackstone', 'blackrock',
-      'carlyle', 'kkr', 'private equity', 'investment bank', 'merrill lynch',
-      'deutsche bank', 'barclays',
+      'citigroup', 'citibank', 'bank of america', 'merrill lynch', 'deutsche bank',
+      'barclays', 'ubs ', 'credit suisse', 'hsbc', 'pnc bank', 'us bank', 'truist',
+      'regions bank', 'fifth third', 'keycorp', 'suntrust',
+      // Asset management & PE
+      'blackstone', 'blackrock', 'carlyle', 'kkr', 'apollo global', 'bain capital',
+      'tpg capital', 'warburg pincus', 'advent international', 'cerberus',
+      'fortress investment', 'lone star', 'silver lake', 'vista equity',
+      // Hedge funds
+      'citadel', 'bridgewater', 'two sigma', 'renaissance technologies', 'point72',
+      'millennium management', 'd.e. shaw', 'elliott management', 'soros fund',
+      // Generic
+      'private equity', 'hedge fund', 'asset management', 'investment bank',
+      'financial group', 'financial services', 'securities', 'capital management',
+      'venture capital',
     ],
   },
   {
@@ -65,6 +102,7 @@ const SECTOR_MAP = [
     keywords: [
       'national rifle association', 'nra ', 'firearm', 'smith & wesson',
       'american outdoor brands', 'ruger', 'sig sauer', 'winchester', 'ammunition',
+      'sturm ruger', 'taurus', 'glock', 'beretta',
     ],
   },
   {
@@ -72,6 +110,7 @@ const SECTOR_MAP = [
     domain: 'healthcare',
     keywords: [
       'altria', 'philip morris', 'reynolds american', 'tobacco', 'lorillard', 'juul',
+      'vector group', 'standard commercial',
     ],
   },
 ];
