@@ -6,6 +6,7 @@ import ZipLookup from './pages/ZipLookup';
 import MyReps from './pages/MyReps';
 import PoliticianProfile from './pages/PoliticianProfile';
 import Survey from './pages/Survey';
+import UpcomingPage from './pages/UpcomingPage';
 import Nav from './components/Nav';
 
 function ProtectedRoute({ children }) {
@@ -23,6 +24,7 @@ export default function App() {
           <Route path="/reps" element={<MyReps />} />
           <Route path="/politician/:id" element={<PoliticianProfile />} />
           <Route path="/survey" element={<ProtectedRoute><Survey /></ProtectedRoute>} />
+          <Route path="/upcoming" element={<UpcomingPage />} />
         </Routes>
       </BrowserRouter>
     </AuthProvider>

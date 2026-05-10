@@ -49,6 +49,13 @@ export default function Nav() {
                 fontFamily: 'var(--font-mono)',
               }}>← Change ZIP</Link>
             )}
+            <Link to="/upcoming" style={{
+              fontSize: 12, fontFamily: 'var(--font-mono)',
+              color: pathname === '/upcoming' ? 'var(--text)' : 'var(--text-2)',
+              padding: '5px 12px',
+              border: '1px solid var(--border-med)',
+              borderRadius: 20,
+            }}>Upcoming</Link>
             {isLoggedIn ? (
               <>
                 <Link to="/survey" style={{
@@ -115,6 +122,12 @@ export default function Nav() {
               display: 'block',
             }}>← Change ZIP</Link>
           )}
+          <Link to="/upcoming" style={{
+            fontSize: 14, fontFamily: 'var(--font-mono)',
+            color: 'var(--text-2)', padding: '0.875rem 0',
+            borderBottom: '1px solid var(--border)',
+            display: 'block',
+          }}>Upcoming</Link>
           {isLoggedIn ? (
             <>
               <Link to="/survey" style={{

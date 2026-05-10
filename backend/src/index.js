@@ -9,6 +9,7 @@ const politicianRoutes = require('./routes/politicians');
 const surveyRoutes     = require('./routes/survey');
 const authRoutes       = require('./routes/auth');
 const adminRoutes      = require('./routes/admin');
+const upcomingRoutes   = require('./routes/upcoming');
 
 const app  = express();
 const PORT = process.env.PORT || 3001;
@@ -57,6 +58,7 @@ app.use('/api/politicians', politicianRoutes);
 app.use('/api/survey', surveyRoutes);
 app.use('/api/auth', authRoutes);
 app.use('/api/admin', adminRoutes);
+app.use('/api/upcoming', upcomingRoutes);
 
 // Health check
 app.get('/health', (req, res) => {

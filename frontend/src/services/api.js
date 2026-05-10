@@ -100,6 +100,17 @@ export async function computeConflicts(politicianId, employers, fecCandidateId =
   return data;
 }
 
+export async function getUpcoming(userId) {
+  try {
+    const params = userId ? { userId } : {};
+    const { data } = await api.get('/upcoming', { params });
+    return data;
+  } catch (err) {
+    if (err?.response?.status === 404) return { elections: [], bills: [], userPriorities: [] };
+    throw err;
+  }
+}
+
 export async function getAlignmentForPolitician(politicianId, userId) {
   const base = (import.meta.env.VITE_API_URL || 'https://votemap-production.up.railway.app/api').replace(/\/api$/, '');
   const token = localStorage.getItem('votemap_token');
