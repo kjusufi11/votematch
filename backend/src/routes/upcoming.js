@@ -86,6 +86,9 @@ router.get('/', async (req, res) => {
       for (const s of (PRIORITY_TO_SUBJECTS[priority] || [])) subjectSet.add(s);
     }
 
+    // Nomination/confirmation votes have ", to be " in the title — exclude them.
+    const NO_NOMINATIONS = `title NOT LIKE '%, to be %'`;
+
     if (subjectSet.size > 0) {
       const subjects = Array.from(subjectSet);
       const billsResult = await db.query(`
@@ -93,7 +96,7 @@ router.get('/', async (req, res) => {
           SELECT DISTINCT ON (title) id, bill_id, number, title, short_title,
                  primary_subject, categories, introduced_date, last_vote_date, status, congress
           FROM bills
-          WHERE primary_subject = ANY($1)
+          WHERE primary_subject = ANY($1) AND ${NO_NOMINATIONS}
           ORDER BY title, id DESC
         ) sub
         ORDER BY id DESC
@@ -106,6 +109,7 @@ router.get('/', async (req, res) => {
           SELECT DISTINCT ON (title) id, bill_id, number, title, short_title,
                  primary_subject, categories, introduced_date, last_vote_date, status, congress
           FROM bills
+          WHERE ${NO_NOMINATIONS}
           ORDER BY title, id DESC
         ) sub
         ORDER BY id DESC
