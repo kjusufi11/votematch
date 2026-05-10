@@ -2,6 +2,7 @@ import React, { useEffect, useState, useMemo, useRef } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import BiasBar from '../components/BiasBar';
 import Avatar from '../components/Avatar';
+import { useAuth } from '../contexts/AuthContext';
 import { getPolitician, getPoliticianVotes, triggerAnalysis, getErrorMessage, getConflicts, computeConflicts, getSurvey } from '../services/api';
 import { findCandidateId, getCommitteeId, getTopEmployers } from '../services/fecClient';
 import { classifyVote, getDomain } from '../utils/domainClassifier';
@@ -25,6 +26,19 @@ function getTopIssueSubject(importance) {
   return top ? (SURVEY_TO_SUBJECT[top[0]] || '') : '';
 }
 
+const SURVEY_BIAS_KEYWORDS = {
+  healthcare:           ['health', 'medical', 'medicare', 'medicaid', 'pharmaceutical', 'drug'],
+  climate:              ['climate', 'energy', 'environment', 'clean', 'fossil', 'carbon', 'emission'],
+  immigration:          ['immigration', 'border', 'asylum', 'deportat', 'migrant'],
+  gun_policy:           ['gun', 'firearm', 'weapon', 'second amendment'],
+  taxes:                ['tax', 'fiscal', 'budget', 'deficit', 'spending', 'appropriat'],
+  defense:              ['defense', 'military', 'foreign', 'national security', 'armed forces', 'veteran'],
+  reproductive_rights:  ['reproductive', 'abortion', 'planned parenthood'],
+  education:            ['education', 'school', 'student'],
+  safety_net:           ['safety net', 'welfare', 'social security', 'snap', 'poverty', 'housing'],
+  criminal_justice:     ['criminal', 'crime', 'justice', 'prison', 'police', 'incarcerat'],
+};
+
 const PC = { D: 'var(--party-d)', R: 'var(--party-r)', I: 'var(--party-i)' };
 const PD = { D: 'var(--party-d-dim)', R: 'var(--party-r-dim)', I: 'var(--party-i-dim)' };
 const PL = { D: 'Democrat', R: 'Republican', I: 'Independent' };
@@ -36,6 +50,7 @@ const SUBJECTS = ['', 'Health', 'Armed Forces', 'Taxation', 'Environmental', 'Im
 
 export default function PoliticianProfile() {
   const { id } = useParams();
+  const { user: authUser, isLoggedIn } = useAuth();
   const [pol,           setPol]           = useState(null);
   const [allVotes,      setAllVotes]      = useState([]);
   const [biases,        setBiases]        = useState([]);
@@ -45,12 +60,14 @@ export default function PoliticianProfile() {
   const [error,         setError]         = useState('');
   const [alignment,     setAlignment]     = useState(null);
   const [alignLoading,  setAlignLoading]  = useState(false);
+  const [alignError,    setAlignError]    = useState(false);
   const [conflicts,     setConflicts]     = useState(null);
   const [conflictsLoading, setConflictsLoading] = useState(false);
   // Vote history expand/collapse
   const [votesExpanded,      setVotesExpanded]      = useState(false);
   const [userSurvey,         setUserSurvey]         = useState(null);
   const [showAllAlignments,  setShowAllAlignments]  = useState(false);
+  const [showMoreTopics,     setShowMoreTopics]     = useState(false);
   const initialFilterSet = useRef(false);
   // Vote filters
   const [search,    setSearch]    = useState('');
@@ -94,7 +111,7 @@ export default function PoliticianProfile() {
       // 1. Try the backend cache first — skip if fecCandidateId is null
       //    (null means a previous FEC lookup failed, so we should retry)
       const cached = await getConflicts(id);
-      if (cached?.fromCache && cached?.fecCandidateId) {
+      if (cached?.fromCache && cached?.fecCandidateId && cached?.conflicts?.length > 0) {
         setConflicts(cached);
         return;
       }
@@ -129,33 +146,31 @@ export default function PoliticianProfile() {
 
   async function loadUserSurvey() {
     try {
-      const stored = localStorage.getItem('votemap_user');
-      if (!stored) return;
-      const user = JSON.parse(stored);
-      if (!user?.id) return;
-      const data = await getSurvey(user.id);
+      if (!authUser?.id) return;
+      const data = await getSurvey(authUser.id);
       if (data?.importance) setUserSurvey(data);
     } catch {}
   }
 
   async function loadAlignment() {
+    if (!authUser?.id) return;
+    setAlignLoading(true);
+    setAlignError(false);
     try {
-      const stored = localStorage.getItem('votemap_user');
-      if (!stored) return;
-      const user = JSON.parse(stored);
-      if (!user?.id) return;
-      setAlignLoading(true);
-      const API = (import.meta.env.VITE_API_URL || 'https://api.votematch.app').replace(/\/api$/, '');
-	const token = localStorage.getItem('votemap_token');
-      const res = await fetch(`${API}/api/politicians/${id}/alignment?userId=${user.id}`, {
+      const API = (import.meta.env.VITE_API_URL || 'https://votemap-production.up.railway.app/api').replace(/\/api$/, '');
+      const token = localStorage.getItem('votemap_token');
+      const res = await fetch(`${API}/api/politicians/${id}/alignment?userId=${authUser.id}`, {
         headers: token ? { Authorization: `Bearer ${token}` } : {},
       });
       if (res.ok) {
         const data = await res.json();
         setAlignment(data);
+      } else {
+        setAlignError(true);
       }
     } catch (err) {
       console.warn('Alignment load failed:', err.message);
+      setAlignError(true);
     } finally {
       setAlignLoading(false);
     }
@@ -214,6 +229,20 @@ export default function PoliticianProfile() {
   // Alignment score color
   const scoreColor = alignment?.score >= 70 ? 'var(--green)' : alignment?.score >= 45 ? 'var(--amber)' : 'var(--red)';
 
+  const hasSurvey = !!(userSurvey?.importance && Object.keys(userSurvey.importance).length > 0);
+  const { importantBiases, otherBiases } = useMemo(() => {
+    if (!hasSurvey || standardBiases.length === 0) return { importantBiases: standardBiases, otherBiases: [] };
+    const important = standardBiases.filter(b => {
+      const cat = b.category.toLowerCase();
+      return Object.entries(userSurvey.importance).some(([issueId, imp]) =>
+        imp >= 2 && (SURVEY_BIAS_KEYWORDS[issueId] || []).some(kw => cat.includes(kw))
+      );
+    });
+    if (important.length < 2) return { importantBiases: standardBiases, otherBiases: [] };
+    const impSet = new Set(important.map(b => b.category));
+    return { importantBiases: important, otherBiases: standardBiases.filter(b => !impSet.has(b.category)) };
+  }, [standardBiases, hasSurvey, userSurvey]);
+
   return (
     <main style={{ maxWidth: 740, margin: '0 auto', padding: '2.5rem 1.5rem 5rem' }}>
       <Link to="/reps" style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12, fontFamily: 'var(--font-mono)', color: 'var(--text-2)', marginBottom: '1.75rem', transition: 'color var(--transition)' }}
@@ -256,13 +285,18 @@ export default function PoliticianProfile() {
       <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
 
         {/* 1. MATCH SCORE + TOP 3 ALIGNMENTS */}
-        {(alignment || alignLoading) && (
+        {isLoggedIn && (
           <section>
             <SectionLabel>Your match</SectionLabel>
             <Panel title="How well do they represent you?">
               <div style={{ padding: '1.25rem' }}>
                 {alignLoading ? (
                   <p style={{ fontSize: 12, color: 'var(--text-3)', fontFamily: 'var(--font-mono)' }}>Calculating…</p>
+                ) : alignError ? (
+                  <p style={{ fontSize: 13, color: 'var(--text-3)' }}>
+                    Unable to load alignment.{' '}
+                    <button onClick={loadAlignment} style={{ fontSize: 13, color: 'var(--text-2)', background: 'none', border: 'none', cursor: 'pointer', padding: 0, textDecoration: 'underline' }}>Retry</button>
+                  </p>
                 ) : alignment?.score == null ? (
                   <p style={{ fontSize: 13, color: 'var(--text-3)' }}>
                     Complete the <Link to="/survey" style={{ color: 'var(--text-2)' }}>values survey</Link> to see your alignment score.
@@ -441,17 +475,35 @@ export default function PoliticianProfile() {
         {/* 3. BIAS ANALYSIS */}
         <section>
           <SectionLabel>Bias analysis</SectionLabel>
-          <Panel title="Issue positions">
+          <Panel title={hasSurvey && importantBiases.length > 0 ? 'Your priority issues' : 'Issue positions'}>
             <div style={{ padding: '1.125rem 1.25rem 0' }}>
               {(analysis?.overall_summary || pol.ai_analysis?.overall_summary) && (
                 <p style={{ fontSize: 13, color: 'var(--text-2)', lineHeight: 1.65, marginBottom: '1rem', paddingBottom: '1rem', borderBottom: '1px solid var(--border)' }}>
                   {analysis?.overall_summary || pol.ai_analysis?.overall_summary}
                 </p>
               )}
-              {standardBiases.length > 0
-                ? standardBiases.map((b, i) => <BiasBar key={b.category} bias={b} delay={i * 0.05} />)
-                : <AnalysisPrompt totalVotes={pol.total_votes} analyzing={analyzing} onRun={runAnalysis} />
-              }
+              {standardBiases.length > 0 ? (
+                <>
+                  {(hasSurvey ? importantBiases : standardBiases).map((b, i) => <BiasBar key={b.category} bias={b} delay={i * 0.05} />)}
+                  {hasSurvey && otherBiases.length > 0 && (
+                    <div style={{ marginBottom: '1rem' }}>
+                      {showMoreTopics && (
+                        <div style={{ marginTop: '1rem', paddingTop: '1rem', borderTop: '1px solid var(--border)' }}>
+                          <p style={{ fontSize: 10, fontFamily: 'var(--font-mono)', color: 'var(--text-3)', letterSpacing: '.08em', textTransform: 'uppercase', marginBottom: '.625rem' }}>Other topics</p>
+                          {otherBiases.map((b, i) => <BiasBar key={b.category} bias={b} delay={i * 0.04} />)}
+                        </div>
+                      )}
+                      <button onClick={() => setShowMoreTopics(x => !x)} style={{
+                        marginTop: '.75rem', fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-2)',
+                        background: 'none', border: 'none', cursor: 'pointer', padding: 0,
+                        transition: 'color var(--transition)',
+                      }}>
+                        {showMoreTopics ? 'Show less ↑' : 'Show more topics ↓'}
+                      </button>
+                    </div>
+                  )}
+                </>
+              ) : <AnalysisPrompt totalVotes={pol.total_votes} analyzing={analyzing} onRun={runAnalysis} />}
             </div>
           </Panel>
           {foreignBiases.length > 0 && (
