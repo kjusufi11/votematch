@@ -603,9 +603,9 @@ export default function PresidentPage() {
       )}
 
       {/* ── Vetoes ── */}
-      {vetoedBills.length > 0 && (
-        <div style={{ marginBottom: '3rem' }}>
-          <SectionLabel>Vetoed bills · 119th Congress ({vetoedBills.length})</SectionLabel>
+      <div style={{ marginBottom: '3rem' }}>
+        <SectionLabel>Vetoed bills · 119th Congress ({vetoedBills.length})</SectionLabel>
+        {vetoedBills.length > 0 ? (
           <div style={{
             background: 'var(--bg-2)', border: '1px solid var(--border)',
             borderRadius: 'var(--radius-lg)', overflow: 'hidden', boxShadow: 'var(--shadow)',
@@ -614,8 +614,12 @@ export default function PresidentPage() {
               <VetoRow key={b.id} bill={b} last={i === vetoedBills.length - 1} />
             ))}
           </div>
-        </div>
-      )}
+        ) : (
+          <p style={{ fontSize: 13, color: 'var(--text-3)', fontFamily: 'var(--font-mono)' }}>
+            No vetoed bills in the 119th Congress.
+          </p>
+        )}
+      </div>
 
       {/* ── Cabinet & Appointments ── */}
       {nominations.length > 0 && (
