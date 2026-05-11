@@ -17,19 +17,34 @@ router.get('/rebuild-status', (req, res) => {
   res.json(progress);
 });
 
-// POST /api/admin/run-migrate — runs all migrations (idempotent, safe to re-run)
-router.post('/run-migrate', async (req, res) => {
+async function runMigrations() {
   const results = [];
-  try {
-    const migrations = require('../db/migrate').getMigrations();
-    for (const sql of migrations) {
-      try {
-        await db.query(sql);
-        results.push({ ok: true, sql: sql.slice(0, 60).replace(/\n/g, ' ').trim() });
-      } catch (err) {
-        results.push({ ok: false, sql: sql.slice(0, 60).replace(/\n/g, ' ').trim(), error: err.message });
-      }
+  const migrations = require('../db/migrate').getMigrations();
+  for (const sql of migrations) {
+    try {
+      await db.query(sql);
+      results.push({ ok: true, sql: sql.slice(0, 60).replace(/\n/g, ' ').trim() });
+    } catch (err) {
+      results.push({ ok: false, sql: sql.slice(0, 60).replace(/\n/g, ' ').trim(), error: err.message });
     }
+  }
+  return results;
+}
+
+// GET /api/admin/run-migrate — same as POST, idempotent
+router.get('/run-migrate', async (req, res) => {
+  try {
+    const results = await runMigrations();
+    res.json({ done: true, results });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// POST /api/admin/run-migrate
+router.post('/run-migrate', async (req, res) => {
+  try {
+    const results = await runMigrations();
     res.json({ done: true, results });
   } catch (err) {
     res.status(500).json({ error: err.message });
