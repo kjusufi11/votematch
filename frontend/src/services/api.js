@@ -111,6 +111,15 @@ export async function getUpcoming(userId) {
   }
 }
 
+// ── President ─────────────────────────────────────────────────────────────────
+
+export async function getPresident(polIds = []) {
+  const params = {};
+  if (polIds.length) params.polIds = polIds.join(',');
+  const { data } = await api.get('/president', { params });
+  return data;
+}
+
 // ── Notification preferences ──────────────────────────────────────────────────
 
 function authHeader() {

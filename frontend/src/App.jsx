@@ -7,6 +7,7 @@ import MyReps from './pages/MyReps';
 import PoliticianProfile from './pages/PoliticianProfile';
 import Survey from './pages/Survey';
 import UpcomingPage from './pages/UpcomingPage';
+import PresidentPage from './pages/PresidentPage';
 import Nav from './components/Nav';
 
 function ProtectedRoute({ children }) {
@@ -25,6 +26,7 @@ export default function App() {
           <Route path="/politician/:id" element={<PoliticianProfile />} />
           <Route path="/survey" element={<ProtectedRoute><Survey /></ProtectedRoute>} />
           <Route path="/upcoming" element={<UpcomingPage />} />
+          <Route path="/president" element={<PresidentPage />} />
         </Routes>
       </BrowserRouter>
     </AuthProvider>

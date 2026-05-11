@@ -56,6 +56,13 @@ export default function Nav() {
               border: '1px solid var(--border-med)',
               borderRadius: 20,
             }}>Upcoming</Link>
+            <Link to="/president" style={{
+              fontSize: 12, fontFamily: 'var(--font-mono)',
+              color: pathname === '/president' ? 'var(--text)' : 'var(--text-2)',
+              padding: '5px 12px',
+              border: '1px solid var(--border-med)',
+              borderRadius: 20,
+            }}>President</Link>
             {isLoggedIn ? (
               <>
                 <Link to="/survey" style={{
@@ -128,6 +135,12 @@ export default function Nav() {
             borderBottom: '1px solid var(--border)',
             display: 'block',
           }}>Upcoming</Link>
+          <Link to="/president" style={{
+            fontSize: 14, fontFamily: 'var(--font-mono)',
+            color: 'var(--text-2)', padding: '0.875rem 0',
+            borderBottom: '1px solid var(--border)',
+            display: 'block',
+          }}>President</Link>
           {isLoggedIn ? (
             <>
               <Link to="/survey" style={{

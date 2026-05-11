@@ -11,6 +11,7 @@ const authRoutes          = require('./routes/auth');
 const adminRoutes         = require('./routes/admin');
 const upcomingRoutes      = require('./routes/upcoming');
 const notificationsRoutes = require('./routes/notifications');
+const presidentRoutes     = require('./routes/president');
 
 const app  = express();
 const PORT = process.env.PORT || 3001;
@@ -61,6 +62,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/upcoming', upcomingRoutes);
 app.use('/api/notifications', notificationsRoutes);
+app.use('/api/president', presidentRoutes);
 
 // Health check
 app.get('/health', (req, res) => {
