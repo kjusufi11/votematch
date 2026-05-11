@@ -3,10 +3,11 @@ const express    = require('express');
 const router     = express.Router();
 const axios      = require('axios');
 const NodeCache  = require('node-cache');
+const crypto     = require('crypto');
 const db         = require('../db');
-const jwt        = require('jsonwebtoken');
 
 const cache = new NodeCache({ stdTTL: 3600 * 6 });
+const JWT_SECRET = process.env.JWT_SECRET || 'votematch-dev-secret';
 
 const cgov = axios.create({
   baseURL: 'https://api.congress.gov/v3',
@@ -19,7 +20,12 @@ function getUser(req) {
     const header = req.headers.authorization || '';
     const token  = header.startsWith('Bearer ') ? header.slice(7) : null;
     if (!token) return null;
-    return jwt.verify(token, process.env.JWT_SECRET);
+    const [h, b, sig] = token.split('.');
+    const expected = crypto.createHmac('sha256', JWT_SECRET).update(`${h}.${b}`).digest('base64url');
+    if (sig !== expected) return null;
+    const payload = JSON.parse(Buffer.from(b, 'base64url').toString());
+    if (payload.exp < Math.floor(Date.now() / 1000)) return null;
+    return payload;
   } catch { return null; }
 }
 
