@@ -18,6 +18,23 @@ const PRIORITY_LABELS = {
   safety_net: 'Social Safety Net', criminal_justice: 'Criminal Justice',
 };
 
+const BILL_TYPE_MAP = {
+  hr: 'house-bill', s: 'senate-bill',
+  hjres: 'house-joint-resolution', sjres: 'senate-joint-resolution',
+  hres: 'house-resolution', sres: 'senate-resolution',
+  hconres: 'house-concurrent-resolution', sconres: 'senate-concurrent-resolution',
+};
+
+function buildCongressUrl(bill) {
+  if (!bill?.id || !bill?.congress) return null;
+  const match = bill.id.match(/^([a-z]+)(\d+)-(\d+)$/);
+  if (!match) return null;
+  const [, type, num, congress] = match;
+  const billType = BILL_TYPE_MAP[type];
+  if (!billType) return null;
+  return `https://www.congress.gov/bill/${congress}th-congress/${billType}/${num}`;
+}
+
 function SectionLabel({ children }) {
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '.75rem' }}>
@@ -27,12 +44,74 @@ function SectionLabel({ children }) {
   );
 }
 
+function ElectionGroup({ senate, house, label, badge }) {
+  return (
+    <div style={{ marginBottom: '1.5rem' }}>
+      {label && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: '.5rem', marginBottom: '.625rem' }}>
+          <p style={{ fontSize: 10, fontFamily: 'var(--font-mono)', color: 'var(--text-3)', letterSpacing: '.1em', textTransform: 'uppercase', margin: 0 }}>
+            {label}
+          </p>
+          {badge && (
+            <span style={{
+              fontSize: 9, fontFamily: 'var(--font-mono)', letterSpacing: '.08em', textTransform: 'uppercase',
+              padding: '2px 7px', borderRadius: 3,
+              background: 'var(--blue-dim, rgba(99,102,241,.12))', color: 'var(--blue, #6366f1)',
+            }}>{badge}</span>
+          )}
+        </div>
+      )}
+      {senate.length > 0 && (
+        <div style={{ marginBottom: house.length > 0 ? '1rem' : 0 }}>
+          {!label && (
+            <p style={{ fontSize: 10, fontFamily: 'var(--font-mono)', color: 'var(--text-3)', letterSpacing: '.1em', textTransform: 'uppercase', marginBottom: '.5rem' }}>
+              Senate seats
+            </p>
+          )}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: '.75rem' }}>
+            {senate.map(pol => <ElectionCard key={pol.id} pol={pol} />)}
+          </div>
+        </div>
+      )}
+      {house.length > 0 && (
+        <div>
+          {!label && (
+            <p style={{ fontSize: 10, fontFamily: 'var(--font-mono)', color: 'var(--text-3)', letterSpacing: '.1em', textTransform: 'uppercase', marginBottom: '.5rem' }}>
+              House seats ({house.length})
+            </p>
+          )}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: '.75rem' }}>
+            {house.slice(0, 30).map(pol => <ElectionCard key={pol.id} pol={pol} />)}
+          </div>
+          {house.length > 30 && (
+            <p style={{ marginTop: '.75rem', fontSize: 12, color: 'var(--text-3)', fontFamily: 'var(--font-mono)' }}>
+              …and {house.length - 30} more House seats. Filter by state to see your district.
+            </p>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function UpcomingPage() {
   const { user, isLoggedIn } = useAuth();
-  const [data, setData]     = useState(null);
+  const [data, setData]       = useState(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError]   = useState('');
+  const [error, setError]     = useState('');
   const [stateFilter, setStateFilter] = useState('');
+  const [userState, setUserState]     = useState('');
+  const [showAllStates, setShowAllStates] = useState(false);
+
+  useEffect(() => {
+    try {
+      const stored = sessionStorage.getItem('votemap_lookup');
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        if (parsed.state) setUserState(parsed.state.toUpperCase());
+      }
+    } catch {}
+  }, []);
 
   useEffect(() => {
     setLoading(true);
@@ -52,17 +131,24 @@ export default function UpcomingPage() {
     <div style={{ textAlign: 'center', padding: '5rem', color: 'var(--red)', fontSize: 14 }}>{error}</div>
   );
 
-  const elections = data?.elections || [];
-  const bills     = data?.bills || [];
+  const elections      = data?.elections || [];
+  const bills          = data?.bills || [];
   const userPriorities = data?.userPriorities || [];
 
-  const states = [...new Set(elections.map(p => p.state))].sort();
-  const filteredElections = stateFilter
-    ? elections.filter(p => p.state === stateFilter)
-    : elections;
+  // ── Elections: split by user state ───────────────────────────────────────
+  const myStateAll  = userState ? elections.filter(p => p.state === userState) : [];
+  const myStateSen  = myStateAll.filter(p => p.chamber === 'senate');
+  const myStateHouse = myStateAll.filter(p => p.chamber === 'house');
+  const hasMyState  = myStateAll.length > 0;
 
-  const senate = filteredElections.filter(p => p.chamber === 'senate');
-  const house  = filteredElections.filter(p => p.chamber === 'house');
+  // "Other" elections: all states when no userState, or all other states
+  const otherAll   = userState ? elections.filter(p => p.state !== userState) : elections;
+  const states     = [...new Set(otherAll.map(p => p.state))].sort();
+  const filtered   = stateFilter ? otherAll.filter(p => p.state === stateFilter) : otherAll;
+  const otherSen   = filtered.filter(p => p.chamber === 'senate');
+  const otherHouse = filtered.filter(p => p.chamber === 'house');
+
+  const showOther = !userState || showAllStates;
 
   return (
     <main style={{ maxWidth: 820, margin: '0 auto', padding: '2.5rem 1.5rem 5rem' }}>
@@ -94,46 +180,83 @@ export default function UpcomingPage() {
           </p>
         ) : (
           <>
-            {/* State filter */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: '.5rem', marginBottom: '1.25rem', flexWrap: 'wrap' }}>
-              <span style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-3)' }}>Filter by state:</span>
-              <select
-                value={stateFilter}
-                onChange={e => setStateFilter(e.target.value)}
-                style={{ fontSize: 12, fontFamily: 'var(--font-mono)', border: '1px solid var(--border-med)', borderRadius: 'var(--radius)', padding: '4px 8px', background: 'var(--bg-2)', outline: 'none', cursor: 'pointer' }}
-              >
-                <option value="">All states ({elections.length})</option>
-                {states.map(s => (
-                  <option key={s} value={s}>{s} ({elections.filter(p => p.state === s).length})</option>
-                ))}
-              </select>
-            </div>
-
-            {senate.length > 0 && (
-              <div style={{ marginBottom: '1.5rem' }}>
-                <p style={{ fontSize: 10, fontFamily: 'var(--font-mono)', color: 'var(--text-3)', letterSpacing: '.1em', textTransform: 'uppercase', marginBottom: '.625rem' }}>
-                  Senate seats
-                </p>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: '.75rem' }}>
-                  {senate.map(pol => <ElectionCard key={pol.id} pol={pol} />)}
-                </div>
-              </div>
+            {/* User's state first */}
+            {hasMyState && (
+              <ElectionGroup
+                senate={myStateSen}
+                house={myStateHouse}
+                label={`${userState} races`}
+                badge="Your state"
+              />
             )}
 
-            {house.length > 0 && (
-              <div>
-                <p style={{ fontSize: 10, fontFamily: 'var(--font-mono)', color: 'var(--text-3)', letterSpacing: '.1em', textTransform: 'uppercase', marginBottom: '.625rem' }}>
-                  House seats ({house.length})
-                </p>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: '.75rem' }}>
-                  {house.slice(0, 30).map(pol => <ElectionCard key={pol.id} pol={pol} />)}
-                </div>
-                {house.length > 30 && (
-                  <p style={{ marginTop: '.75rem', fontSize: 12, color: 'var(--text-3)', fontFamily: 'var(--font-mono)' }}>
-                    …and {house.length - 30} more House seats. Filter by state to see your district.
-                  </p>
+            {/* All other states — collapsed if user has a state */}
+            {showOther && (
+              <>
+                {userState && hasMyState && (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '.5rem', marginBottom: '1rem' }}>
+                    <span style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-3)' }}>All states</span>
+                    <div style={{ flex: 1, height: 1, background: 'var(--border)' }} />
+                  </div>
                 )}
-              </div>
+
+                {/* State filter (only shown in all-states view) */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '.5rem', marginBottom: '1.25rem', flexWrap: 'wrap' }}>
+                  <span style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-3)' }}>Filter by state:</span>
+                  <select
+                    value={stateFilter}
+                    onChange={e => setStateFilter(e.target.value)}
+                    style={{ fontSize: 12, fontFamily: 'var(--font-mono)', border: '1px solid var(--border-med)', borderRadius: 'var(--radius)', padding: '4px 8px', background: 'var(--bg-2)', outline: 'none', cursor: 'pointer' }}
+                  >
+                    <option value="">All states ({otherAll.length})</option>
+                    {states.map(s => (
+                      <option key={s} value={s}>{s} ({otherAll.filter(p => p.state === s).length})</option>
+                    ))}
+                  </select>
+                </div>
+
+                {otherSen.length > 0 && (
+                  <div style={{ marginBottom: '1.5rem' }}>
+                    <p style={{ fontSize: 10, fontFamily: 'var(--font-mono)', color: 'var(--text-3)', letterSpacing: '.1em', textTransform: 'uppercase', marginBottom: '.625rem' }}>
+                      Senate seats
+                    </p>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: '.75rem' }}>
+                      {otherSen.map(pol => <ElectionCard key={pol.id} pol={pol} />)}
+                    </div>
+                  </div>
+                )}
+
+                {otherHouse.length > 0 && (
+                  <div>
+                    <p style={{ fontSize: 10, fontFamily: 'var(--font-mono)', color: 'var(--text-3)', letterSpacing: '.1em', textTransform: 'uppercase', marginBottom: '.625rem' }}>
+                      House seats ({otherHouse.length})
+                    </p>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: '.75rem' }}>
+                      {otherHouse.slice(0, 30).map(pol => <ElectionCard key={pol.id} pol={pol} />)}
+                    </div>
+                    {otherHouse.length > 30 && (
+                      <p style={{ marginTop: '.75rem', fontSize: 12, color: 'var(--text-3)', fontFamily: 'var(--font-mono)' }}>
+                        …and {otherHouse.length - 30} more House seats. Filter by state to see your district.
+                      </p>
+                    )}
+                  </div>
+                )}
+              </>
+            )}
+
+            {/* Show all states toggle */}
+            {userState && hasMyState && !showAllStates && otherAll.length > 0 && (
+              <button
+                onClick={() => setShowAllStates(true)}
+                style={{
+                  marginTop: '.5rem', fontSize: 13, fontFamily: 'var(--font-mono)',
+                  color: 'var(--text-2)', background: 'transparent',
+                  border: '1px solid var(--border-med)', borderRadius: 'var(--radius)',
+                  padding: '8px 16px', cursor: 'pointer',
+                }}
+              >
+                Show all states ({otherAll.length} more seats) ↓
+              </button>
             )}
           </>
         )}
@@ -210,15 +333,17 @@ function ElectionCard({ pol }) {
 }
 
 function BillRow({ bill, last }) {
-  const date = bill.last_vote_date || bill.introduced_date;
+  const date    = bill.last_vote_date || bill.introduced_date;
   const dateStr = date ? new Date(date).toLocaleDateString('en-US', { month: 'short', year: 'numeric' }) : null;
+  const url     = buildCongressUrl(bill);
+
   return (
     <div style={{
-      padding: '10px 1.25rem', borderBottom: last ? 'none' : '1px solid var(--border)',
+      padding: '12px 1.25rem', borderBottom: last ? 'none' : '1px solid var(--border)',
       display: 'flex', gap: '.875rem', alignItems: 'flex-start',
     }}>
       <div style={{ flex: 1, minWidth: 0 }}>
-        <p style={{ fontSize: 13, color: 'var(--text)', lineHeight: 1.45, marginBottom: 3 }}>
+        <p style={{ fontSize: 13, color: 'var(--text)', lineHeight: 1.45, marginBottom: 5 }}>
           {bill.short_title || bill.title}
         </p>
         <div style={{ display: 'flex', gap: '.5rem', flexWrap: 'wrap', alignItems: 'center' }}>
@@ -232,6 +357,19 @@ function BillRow({ bill, last }) {
           )}
           {bill.status && (
             <span style={{ fontSize: 10, fontFamily: 'var(--font-mono)', color: 'var(--text-3)' }}>{bill.status}</span>
+          )}
+          {url && (
+            <a
+              href={url}
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={e => e.stopPropagation()}
+              style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-2)', textDecoration: 'none', whiteSpace: 'nowrap' }}
+              onMouseEnter={e => e.currentTarget.style.color = 'var(--text)'}
+              onMouseLeave={e => e.currentTarget.style.color = 'var(--text-2)'}
+            >
+              Read more →
+            </a>
           )}
         </div>
       </div>
