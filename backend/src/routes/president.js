@@ -79,7 +79,7 @@ function classifyDomains(eo) {
 
 // ── Federal Register ─────────────────────────────────────────────────────────
 
-async function fetchExecutiveOrders(perPage = 20) {
+async function fetchExecutiveOrders(perPage = 250) {
   const cacheKey = `eos_${perPage}`;
   const cached = cache.get(cacheKey);
   if (cached) return cached;
@@ -265,6 +265,7 @@ async function fetchNominations() {
     const nominations = (data.nominations || [])
       .filter(n => !n.isMilitary)          // skip bulk military promotions
       .map(parseNomination)
+      .filter(n => n.name?.trim())         // skip entries with no parseable name
       .filter(n => n.confirmed || n.withdrawn); // only settled nominations
 
     cache.set(cacheKey, nominations, 3600 * 6);
@@ -307,7 +308,7 @@ router.get('/', async (req, res) => {
 
   try {
     const [eoData, enactedBills, vetoedBills, nominations, repVotes] = await Promise.all([
-      fetchExecutiveOrders(20),
+      fetchExecutiveOrders(),
       fetchEnactedBills(),
       fetchVetoedBills(),
       fetchNominations(),

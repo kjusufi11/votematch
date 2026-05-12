@@ -19,7 +19,9 @@ export default function ZipLookup() {
     setError(''); setLoading(true);
     try {
       const data = await lookupZip(clean);
-      sessionStorage.setItem('votemap_lookup', JSON.stringify({ zip: clean, ...data }));
+      const payload = JSON.stringify({ zip: clean, ...data });
+      sessionStorage.setItem('votemap_lookup', payload);
+      localStorage.setItem('votemap_lookup', payload);
       navigate('/reps');
     } catch (err) {
       setError(getErrorMessage(err));

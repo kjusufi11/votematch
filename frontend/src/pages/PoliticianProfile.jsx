@@ -135,8 +135,7 @@ export default function PoliticianProfile() {
   async function loadConflicts(polData) {
     setConflictsLoading(true);
     try {
-      // 1. Try the backend cache first — skip if fecCandidateId is null
-      //    (null means a previous FEC lookup failed, so we should retry)
+      // 1. Try the backend cache first — use if valid FEC result exists with conflicts
       const cached = await getConflicts(id);
       if (cached?.fromCache && cached?.fecCandidateId && cached?.conflicts?.length > 0) {
         setConflicts(cached);
@@ -145,17 +144,17 @@ export default function PoliticianProfile() {
 
       // 2. Cache miss — fetch FEC data from the browser (api.fec.gov supports CORS)
       if (!polData?.full_name || !polData?.state || !polData?.chamber) {
-        setConflicts({ conflicts: [], topDonors: [] });
+        setConflicts({ conflicts: [], topDonors: [], fecError: 'Missing politician data.' });
         return;
       }
       const found = await findCandidateId(polData.full_name, polData.state, polData.chamber);
       if (!found?.candidateId) {
-        setConflicts({ conflicts: [], topDonors: [] });
+        setConflicts({ conflicts: [], topDonors: [], fecError: `No FEC candidate record found for ${polData.full_name}.` });
         return;
       }
       const committeeId = await getCommitteeId(found.candidateId);
       if (!committeeId) {
-        setConflicts({ conflicts: [], topDonors: [] });
+        setConflicts({ conflicts: [], topDonors: [], fecError: `No FEC campaign committee found (ID: ${found.candidateId}).` });
         return;
       }
       const employers = await getTopEmployers(committeeId);
@@ -165,10 +164,15 @@ export default function PoliticianProfile() {
       setConflicts(result);
     } catch (err) {
       console.warn('Conflicts load failed:', err.message);
-      setConflicts({ conflicts: [], topDonors: [] });
+      setConflicts({ conflicts: [], topDonors: [], fecError: err.message });
     } finally {
       setConflictsLoading(false);
     }
+  }
+
+  function retryConflicts() {
+    setConflicts(null);
+    loadConflicts(pol);
   }
 
   async function loadUserSurvey() {
@@ -437,7 +441,10 @@ export default function PoliticianProfile() {
                         <p style={{ fontSize: 12, color: 'var(--text-3)', fontFamily: 'var(--font-mono)', fontStyle: 'italic' }}>
                           {conflicts.topDonors?.length > 0
                             ? 'Donor data loaded — no voting conflicts detected above threshold with these industries.'
-                            : 'FEC donor data unavailable for this politician.'}
+                            : <>{conflicts.fecError || 'FEC donor data unavailable for this politician.'}{' '}
+                                <button onClick={retryConflicts} style={{ fontSize: 12, fontFamily: 'var(--font-mono)', background: 'none', border: 'none', color: 'var(--text-2)', cursor: 'pointer', padding: 0, textDecoration: 'underline' }}>Retry</button>
+                              </>
+                          }
                         </p>
                       ) : conflicts.conflicts.map((c, i) => {
                         const d   = getDomain(c.domain);
@@ -470,7 +477,7 @@ export default function PoliticianProfile() {
                       {conflicts.topDonors?.length > 0 && (
                         <div style={{ marginTop: '1.25rem', paddingTop: '1rem', borderTop: '1px solid var(--border)' }}>
                           <p style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-3)', marginBottom: '.5rem', textTransform: 'uppercase', letterSpacing: '.06em' }}>
-                            Top donor employers (2022–2024)
+                            Top donor employers (2022–2026)
                           </p>
                           {conflicts.topDonors.map((d, i) => (
                             <div key={i} style={{ display: 'flex', justifyContent: 'space-between', padding: '3px 0', fontSize: 12, fontFamily: 'var(--font-mono)' }}>

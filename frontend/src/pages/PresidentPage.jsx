@@ -496,7 +496,7 @@ export default function PresidentPage() {
 
       {/* ── Executive orders ── */}
       <div style={{ marginBottom: '3rem' }}>
-        <SectionLabel>Executive orders ({executiveOrders.length})</SectionLabel>
+        <SectionLabel>Executive orders ({stats?.eoCount ?? executiveOrders.length} total)</SectionLabel>
 
         {!showEOs ? (
           <button
@@ -509,7 +509,7 @@ export default function PresidentPage() {
               cursor: 'pointer',
             }}
           >
-            Show all {executiveOrders.length} executive orders ↓
+            Show all {stats?.eoCount ?? executiveOrders.length} executive orders ↓
           </button>
         ) : (
           <>
@@ -691,9 +691,9 @@ export default function PresidentPage() {
 
 function getRepPolIds() {
   try {
-    const stored = sessionStorage.getItem('votemap_lookup');
-    if (!stored) return [];
-    const parsed = JSON.parse(stored);
+    const raw = sessionStorage.getItem('votemap_lookup') || localStorage.getItem('votemap_lookup');
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
     return (parsed.representatives || [])
       .filter(r => r.level === 'federal' && r.id)
       .map(r => r.id);
