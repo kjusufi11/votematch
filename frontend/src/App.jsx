@@ -13,6 +13,7 @@ import UpcomingPage from './pages/UpcomingPage';
 import PresidentPage from './pages/PresidentPage';
 import Nav from './components/Nav';
 import Footer from './components/Footer';
+import InstallBanner from './components/InstallBanner';
 
 function ProtectedRoute({ children }) {
   const { isLoggedIn } = useAuth();
@@ -36,6 +37,7 @@ export default function App() {
           <Route path="/terms" element={<TermsPage />} />
         </Routes>
         <Footer />
+        <InstallBanner />
       </BrowserRouter>
     </AuthProvider>
   );

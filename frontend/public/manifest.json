@@ -1,0 +1,14 @@
+{
+  "name": "VoteMatch",
+  "short_name": "VoteMatch",
+  "description": "See how your representatives really vote. Compare their record to your values.",
+  "theme_color": "#f5f3ee",
+  "background_color": "#f5f3ee",
+  "display": "standalone",
+  "scope": "/",
+  "start_url": "/",
+  "orientation": "portrait",
+  "icons": [
+    { "src": "/icon.svg", "sizes": "any", "type": "image/svg+xml" }
+  ]
+}
