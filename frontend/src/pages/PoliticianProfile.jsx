@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useMemo, useRef } from 'react';
 import { useParams, Link } from 'react-router-dom';
+import { Helmet } from 'react-helmet-async';
 import BiasBar, { CATEGORY_LABELS } from '../components/BiasBar';
 import Avatar from '../components/Avatar';
 import { useAuth } from '../contexts/AuthContext';
@@ -268,7 +269,24 @@ export default function PoliticianProfile() {
   // Alignment score color
   const scoreColor = alignment?.score >= 70 ? 'var(--green)' : alignment?.score >= 45 ? 'var(--amber)' : 'var(--red)';
 
+  const metaTitle = pol
+    ? `${pol.full_name} (${pol.party}-${pol.state}) — VoteMatch`
+    : 'Representative — VoteMatch';
+  const metaDesc = pol
+    ? `See how ${pol.full_name} votes on healthcare, climate, immigration, and more. Compare their record to your own values on VoteMatch.`
+    : 'Track how your representatives vote. Compare their record to your values on VoteMatch.';
+
   return (
+    <>
+    <Helmet>
+      <title>{metaTitle}</title>
+      <meta name="description" content={metaDesc} />
+      <meta property="og:title" content={metaTitle} />
+      <meta property="og:description" content={metaDesc} />
+      <meta property="og:url" content={`https://votematch.app/politician/${id}`} />
+      <meta name="twitter:title" content={metaTitle} />
+      <meta name="twitter:description" content={metaDesc} />
+    </Helmet>
     <main style={{ maxWidth: 740, margin: '0 auto', padding: '2.5rem 1.5rem 5rem' }}>
       <Link to="/reps" style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12, fontFamily: 'var(--font-mono)', color: 'var(--text-2)', marginBottom: '1.75rem', transition: 'color var(--transition)' }}
         onMouseEnter={e => e.currentTarget.style.color = 'var(--text)'}
@@ -655,6 +673,7 @@ export default function PoliticianProfile() {
         <Link to="/reps" style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-2)', border: '1px solid var(--border-med)', borderRadius: 'var(--radius)', padding: '5px 10px' }}>← Back</Link>
       </div>
     </main>
+    </>
   );
 }
 
