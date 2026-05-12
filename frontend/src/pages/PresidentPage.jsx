@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import { getPresident, getSurvey } from '../services/api';
+import { getPresident, getSurvey, getPresidentEOs } from '../services/api';
 
 const PARTY_COLOR = { D: 'var(--party-d)', R: 'var(--party-r)', I: 'var(--party-i)' };
 const PARTY_DIM   = { D: 'var(--party-d-dim)', R: 'var(--party-r-dim)', I: 'var(--party-i-dim)' };
@@ -89,6 +89,24 @@ function PriorityBadge() {
       background: 'var(--green-dim)', color: 'var(--green)', whiteSpace: 'nowrap',
       fontWeight: 600,
     }}>Affects your priorities</span>
+  );
+}
+
+function SkeletonCard() {
+  return (
+    <div style={{
+      background: 'var(--bg-2)', border: '1px solid var(--border)',
+      borderRadius: 'var(--radius-lg)', padding: '1rem 1.25rem', boxShadow: 'var(--shadow)',
+    }}>
+      <div style={{ display: 'flex', gap: '.5rem', marginBottom: 8 }}>
+        <div style={{ height: 16, width: 44, background: 'var(--bg-3)', borderRadius: 3 }} />
+        <div style={{ height: 16, width: 72, background: 'var(--bg-3)', borderRadius: 3 }} />
+      </div>
+      <div style={{ height: 14, width: '88%', background: 'var(--bg-3)', borderRadius: 3, marginBottom: 5 }} />
+      <div style={{ height: 14, width: '72%', background: 'var(--bg-3)', borderRadius: 3, marginBottom: 10 }} />
+      <div style={{ height: 11, width: '100%', background: 'var(--bg-3)', borderRadius: 3, marginBottom: 4 }} />
+      <div style={{ height: 11, width: '55%', background: 'var(--bg-3)', borderRadius: 3 }} />
+    </div>
   );
 }
 
@@ -364,6 +382,8 @@ export default function PresidentPage() {
   const [activeFilter, setActiveFilter] = useState(null);
   const [viewMode, setViewMode]   = useState('cards'); // 'cards' | 'timeline'
   const [showEOs, setShowEOs]     = useState(false);
+  // null = not fetched, 'loading' = in-flight, array = done
+  const [eos, setEos]             = useState(null);
   const [userPriorities, setUserPriorities] = useState(null);
 
   useEffect(() => {
@@ -389,22 +409,34 @@ export default function PresidentPage() {
     }).catch(() => {});
   }, [user]);
 
+  // Auto-reveal EO section when filters/search/timeline are activated
   useEffect(() => {
     if (activeFilter || search.trim() || viewMode === 'timeline') setShowEOs(true);
   }, [activeFilter, search, viewMode]);
 
-  const { president, stats, executiveOrders = [], enactedBills = [], vetoedBills = [], nominations = [], repVotes = [] } = data || {};
+  // Fetch EOs when section is revealed for the first time
+  useEffect(() => {
+    if (!showEOs || eos !== null) return;
+    setEos('loading');
+    getPresidentEOs()
+      .then(d => setEos(d.orders || []))
+      .catch(() => setEos([]));
+  }, [showEOs, eos]);
 
-  // Domain counts for filter pills
+  const { president, stats, enactedBills = [], vetoedBills = [], nominations = [], repVotes = [] } = data || {};
+
+  const eosArray = Array.isArray(eos) ? eos : [];
+
+  // Domain counts for filter pills — only available once EOs are loaded
   const domainCounts = useMemo(() => {
     const counts = {};
-    for (const eo of executiveOrders) {
+    for (const eo of eosArray) {
       for (const d of (eo.domains || [])) {
         counts[d] = (counts[d] || 0) + 1;
       }
     }
     return counts;
-  }, [executiveOrders]);
+  }, [eosArray]);
 
   const activeDomains = useMemo(() =>
     Object.entries(domainCounts)
@@ -414,7 +446,7 @@ export default function PresidentPage() {
   );
 
   const filteredOrders = useMemo(() => {
-    let orders = executiveOrders;
+    let orders = eosArray;
     if (activeFilter) orders = orders.filter(eo => (eo.domains || []).includes(activeFilter));
     if (search.trim()) {
       const q = search.toLowerCase();
@@ -425,7 +457,7 @@ export default function PresidentPage() {
       );
     }
     return orders;
-  }, [executiveOrders, activeFilter, search]);
+  }, [eosArray, activeFilter, search]);
 
   const userPriorityDomains = userPriorities || new Set();
 
@@ -496,7 +528,7 @@ export default function PresidentPage() {
 
       {/* ── Executive orders ── */}
       <div style={{ marginBottom: '3rem' }}>
-        <SectionLabel>Executive orders ({stats?.eoCount ?? executiveOrders.length} total)</SectionLabel>
+        <SectionLabel>Executive orders ({stats?.eoCount ?? '…'} total)</SectionLabel>
 
         {!showEOs ? (
           <button
@@ -509,8 +541,12 @@ export default function PresidentPage() {
               cursor: 'pointer',
             }}
           >
-            Show all {stats?.eoCount ?? executiveOrders.length} executive orders ↓
+            Show all {stats?.eoCount ?? '…'} executive orders ↓
           </button>
+        ) : eos === 'loading' ? (
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '.75rem' }}>
+            {Array.from({ length: 6 }).map((_, i) => <SkeletonCard key={i} />)}
+          </div>
         ) : (
           <>
             {/* Search + view toggle */}

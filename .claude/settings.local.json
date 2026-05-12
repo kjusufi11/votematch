@@ -104,7 +104,20 @@
       "WebFetch(domain:votematch.app)",
       "PowerShell(Invoke-WebRequest -Uri \"https://votemap-production.up.railway.app/api/admin/run-migrate\" -Method POST -ContentType \"application/json\" | Select-Object -ExpandProperty Content)",
       "PowerShell($git = \"C:\\\\Users\\\\krena\\\\AppData\\\\Local\\\\GitHubDesktop\\\\app-3.5.8\\\\resources\\\\app\\\\git\\\\cmd\\\\git.exe\"; Set-Location \"C:\\\\Users\\\\krena\\\\OneDrive\\\\Documents\\\\Votemap\\\\votemap_project\\\\votemap\"; & $git add backend/src/routes/admin.js; & $git commit -m \"Add GET /api/admin/run-migrate for easier triggering\"; & $git push origin main)",
-      "PowerShell($git = \"C:\\\\Users\\\\krena\\\\AppData\\\\Local\\\\GitHubDesktop\\\\app-3.5.8\\\\resources\\\\app\\\\git\\\\cmd\\\\git.exe\"; Set-Location \"C:\\\\Users\\\\krena\\\\OneDrive\\\\Documents\\\\Votemap\\\\votemap_project\\\\votemap\"; & $git add -A; & $git status --short)"
+      "PowerShell($git = \"C:\\\\Users\\\\krena\\\\AppData\\\\Local\\\\GitHubDesktop\\\\app-3.5.8\\\\resources\\\\app\\\\git\\\\cmd\\\\git.exe\"; Set-Location \"C:\\\\Users\\\\krena\\\\OneDrive\\\\Documents\\\\Votemap\\\\votemap_project\\\\votemap\"; & $git add -A; & $git status --short)",
+      "WebFetch(domain:www.federalregister.gov)",
+      "WebFetch(domain:api.congress.gov)",
+      "PowerShell($env:PATH = $env:PATH + \";C:\\\\Program Files\\\\Git\\\\bin;C:\\\\Program Files\\\\Git\\\\cmd\"; cd \"C:\\\\Users\\\\krena\\\\OneDrive\\\\Documents\\\\Votemap\\\\votemap_project\\\\votemap\"; git status --short; git log --oneline -5)",
+      "PowerShell($gitPath = \\(Get-ChildItem \"C:\\\\Users\\\\krena\" -Recurse -Filter \"git.exe\" -ErrorAction SilentlyContinue | Select-Object -First 1\\).FullName; Write-Output \"Git: $gitPath\")",
+      "PowerShell(cmd /c \"git --version\" 2>&1)",
+      "PowerShell($env:PATH -split \";\" | Where-Object { $_ -ne \"\" } | Sort-Object)",
+      "PowerShell($p = \"C:\\\\Users\\\\krena\\\\AppData\\\\Local\\\\GitHubDesktop\\\\app-3.5.8\"; [System.IO.Directory]::GetFiles\\($p\\) | Select-Object -First 5; [System.IO.Directory]::GetDirectories\\($p\\) | Select-Object -First 10)",
+      "PowerShell([System.IO.Directory]::GetDirectories\\(\"C:\\\\Users\\\\krena\\\\AppData\\\\Local\\\\GitHubDesktop\\\\app-3.5.8\\\\resources\"\\))",
+      "PowerShell([System.IO.Directory]::GetDirectories\\(\"C:\\\\Users\\\\krena\\\\AppData\\\\Local\\\\GitHubDesktop\\\\app-3.5.8\\\\resources\\\\app\"\\) | Select-Object -First 15)",
+      "PowerShell(git diff *)",
+      "PowerShell(& \"C:\\\\Users\\\\krena\\\\AppData\\\\Local\\\\GitHubDesktop\\\\bin\\\\git.exe\" diff --stat)",
+      "PowerShell(Get-ChildItem *)",
+      "PowerShell(cmd /c \"git diff --stat\" 2>&1)"
     ]
   }
 }

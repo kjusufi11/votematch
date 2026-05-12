@@ -122,6 +122,31 @@ async function fetchExecutiveOrders(perPage = 250) {
   return result;
 }
 
+// Lightweight count-only fetch — avoids loading 250 EOs just to get the total
+async function fetchEOCount() {
+  const cacheKey = 'eo_count';
+  const cached = cache.get(cacheKey);
+  if (cached !== undefined) return cached;
+
+  const { data } = await axios.get(
+    'https://www.federalregister.gov/api/v1/documents.json',
+    {
+      params: {
+        'conditions[type]': 'PRESDOCU',
+        'conditions[presidential_document_type]': 'executive_order',
+        'conditions[publication_date][gte]': PRESIDENT.term_start,
+        per_page: 1,
+        'fields[]': ['document_number'],
+      },
+      timeout: 8000,
+    }
+  );
+
+  const count = data.count || 0;
+  cache.set(cacheKey, count, 3600);
+  return count;
+}
+
 // ── AI summary ───────────────────────────────────────────────────────────────
 
 async function getAISummary(eo) {
@@ -299,31 +324,43 @@ async function getRepVotes(polIds) {
   return rows;
 }
 
-// ── Route ────────────────────────────────────────────────────────────────────
+// ── Routes ───────────────────────────────────────────────────────────────────
 
+// GET /api/president/eos — full EO list with AI summaries, loaded lazily by frontend
+router.get('/eos', async (req, res) => {
+  try {
+    const eoData = await fetchExecutiveOrders();
+    const ordersWithSummaries = await addSummaries(eoData.orders);
+    res.json({ total: eoData.total, orders: ordersWithSummaries });
+  } catch (err) {
+    console.error('[president/eos]', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// GET /api/president — fast: stats + bills + nominations + rep votes (no EO list)
 router.get('/', async (req, res) => {
   const polIds = req.query.polIds
     ? req.query.polIds.split(',').map(s => s.trim()).filter(Boolean)
     : [];
 
   try {
-    const [eoData, enactedBills, vetoedBills, nominations, repVotes] = await Promise.all([
-      fetchExecutiveOrders(),
+    const [eoCount, enactedBills, vetoedBills, nominations, repVotes] = await Promise.all([
+      fetchEOCount(),
       fetchEnactedBills(),
       fetchVetoedBills(),
       fetchNominations(),
       getRepVotes(polIds),
     ]);
 
-    const ordersWithSummaries = await addSummaries(eoData.orders);
     const daysInOffice = Math.floor(
       (Date.now() - new Date(PRESIDENT.term_start).getTime()) / 86400000
     );
 
     res.json({
       president:       { ...PRESIDENT, daysInOffice },
-      stats:           { eoCount: eoData.total, enactedCount: enactedBills.length, daysInOffice },
-      executiveOrders: ordersWithSummaries,
+      stats:           { eoCount, enactedCount: enactedBills.length, daysInOffice },
+      executiveOrders: [],   // loaded separately via GET /eos
       enactedBills,
       vetoedBills,
       nominations,

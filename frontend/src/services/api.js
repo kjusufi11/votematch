@@ -120,6 +120,11 @@ export async function getPresident(polIds = []) {
   return data;
 }
 
+export async function getPresidentEOs() {
+  const { data } = await api.get('/president/eos', { timeout: 90000 });
+  return data;
+}
+
 // ── Bills ─────────────────────────────────────────────────────────────────────
 
 export async function getBillDetails(congress, type, number, polIds = []) {
