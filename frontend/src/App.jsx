@@ -7,9 +7,12 @@ import MyReps from './pages/MyReps';
 import PoliticianProfile from './pages/PoliticianProfile';
 import Survey from './pages/Survey';
 import ExtendedSurvey from './pages/ExtendedSurvey';
+import PrivacyPage from './pages/PrivacyPage';
+import TermsPage from './pages/TermsPage';
 import UpcomingPage from './pages/UpcomingPage';
 import PresidentPage from './pages/PresidentPage';
 import Nav from './components/Nav';
+import Footer from './components/Footer';
 
 function ProtectedRoute({ children }) {
   const { isLoggedIn } = useAuth();
@@ -29,7 +32,10 @@ export default function App() {
           <Route path="/survey/extended" element={<ProtectedRoute><ExtendedSurvey /></ProtectedRoute>} />
           <Route path="/upcoming" element={<UpcomingPage />} />
           <Route path="/president" element={<PresidentPage />} />
+          <Route path="/privacy" element={<PrivacyPage />} />
+          <Route path="/terms" element={<TermsPage />} />
         </Routes>
+        <Footer />
       </BrowserRouter>
     </AuthProvider>
   );

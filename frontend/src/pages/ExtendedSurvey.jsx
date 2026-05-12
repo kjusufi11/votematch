@@ -599,6 +599,9 @@ function SectionConsent({ consent, setConsent }) {
 
       <p style={{ fontSize: 12, color: 'var(--text-3)', lineHeight: 1.65, marginTop: '1rem' }}>
         Consent is optional. Your survey will be saved and improve your match score regardless of this choice.
+        Read our{' '}
+        <Link to="/privacy" style={{ color: 'var(--text-3)', textDecoration: 'underline' }}>Privacy Policy</Link>
+        {' '}to learn how data is used and how to withdraw consent.
       </p>
     </div>
   );
