@@ -1,8 +1,19 @@
 // src/routes/notifications.js
-const express = require('express');
-const router  = express.Router();
-const crypto  = require('crypto');
-const db      = require('../db');
+const express  = require('express');
+const router   = express.Router();
+const crypto   = require('crypto');
+const db       = require('../db');
+const webpush  = require('web-push');
+
+// VAPID configuration — keys must be set as env vars VAPID_PUBLIC_KEY and VAPID_PRIVATE_KEY.
+// Generate once with: require('web-push').generateVAPIDKeys()
+if (process.env.VAPID_PUBLIC_KEY && process.env.VAPID_PRIVATE_KEY) {
+  webpush.setVapidDetails(
+    'mailto:privacy@votematch.app',
+    process.env.VAPID_PUBLIC_KEY,
+    process.env.VAPID_PRIVATE_KEY
+  );
+}
 
 const JWT_SECRET = process.env.JWT_SECRET || 'votematch-dev-secret';
 
@@ -73,4 +84,59 @@ router.get('/unsubscribe', async (req, res) => {
   }
 });
 
+// GET /api/notifications/vapid-public-key — frontend needs this to subscribe
+router.get('/vapid-public-key', (req, res) => {
+  if (!process.env.VAPID_PUBLIC_KEY) return res.status(503).json({ error: 'Push not configured' });
+  res.json({ publicKey: process.env.VAPID_PUBLIC_KEY });
+});
+
+// POST /api/notifications/push-subscribe — store a push subscription
+router.post('/push-subscribe', requireAuth, async (req, res) => {
+  const { endpoint, keys } = req.body;
+  if (!endpoint || !keys?.p256dh || !keys?.auth) {
+    return res.status(400).json({ error: 'Invalid subscription object' });
+  }
+  try {
+    await db.query(`
+      INSERT INTO push_subscriptions (user_id, endpoint, keys)
+      VALUES ($1, $2, $3)
+      ON CONFLICT (endpoint) DO UPDATE SET user_id = $1, keys = $3
+    `, [req.userId, endpoint, JSON.stringify(keys)]);
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// DELETE /api/notifications/push-subscribe — remove a push subscription
+router.delete('/push-subscribe', requireAuth, async (req, res) => {
+  const { endpoint } = req.body;
+  if (!endpoint) return res.status(400).json({ error: 'endpoint required' });
+  try {
+    await db.query('DELETE FROM push_subscriptions WHERE user_id = $1 AND endpoint = $2', [req.userId, endpoint]);
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 module.exports = router;
+
+// Exported helper — call this from vote alert sending logic to also push
+async function sendPushToUser(userId, title, body, url = '/') {
+  if (!process.env.VAPID_PUBLIC_KEY) return;
+  try {
+    const { rows } = await db.query('SELECT endpoint, keys FROM push_subscriptions WHERE user_id = $1', [userId]);
+    const payload = JSON.stringify({ title, body, url, icon: '/icon.svg' });
+    await Promise.allSettled(rows.map(row =>
+      webpush.sendNotification({ endpoint: row.endpoint, keys: row.keys }, payload)
+        .catch(async err => {
+          if (err.statusCode === 410) {
+            await db.query('DELETE FROM push_subscriptions WHERE endpoint = $1', [row.endpoint]);
+          }
+        })
+    ));
+  } catch {}
+}
+
+module.exports.sendPushToUser = sendPushToUser;

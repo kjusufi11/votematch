@@ -105,8 +105,18 @@ app.use((err, req, res, next) => {
   res.status(500).json({ error: 'Internal server error.' });
 });
 
-// Idempotent table creation for extended survey
+// Idempotent table creation
 const db = require('./db');
+db.query(`
+  CREATE TABLE IF NOT EXISTS push_subscriptions (
+    id SERIAL PRIMARY KEY,
+    user_id TEXT NOT NULL,
+    endpoint TEXT NOT NULL UNIQUE,
+    keys JSONB NOT NULL,
+    created_at TIMESTAMPTZ DEFAULT NOW()
+  )
+`).catch(e => console.warn('[startup] push_subscriptions table:', e.message));
+
 db.query(`
   CREATE TABLE IF NOT EXISTS extended_survey_responses (
     user_id TEXT PRIMARY KEY,

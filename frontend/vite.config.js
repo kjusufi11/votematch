@@ -23,20 +23,13 @@ export default defineConfig({
           { src: '/icon-512.png', sizes: '512x512', type: 'image/png', purpose: 'any maskable' },
           { src: '/icon.svg',     sizes: 'any',     type: 'image/svg+xml' },
         ],
-        screenshots: [
-          {
-            src: '/og-image.png',
-            sizes: '1200x630',
-            type: 'image/png',
-            form_factor: 'wide',
-            label: 'VoteMatch — Match your values to your representatives',
-          },
-        ],
       },
       workbox: {
         globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2}'],
         navigateFallback: '/index.html',
-        navigateFallbackDenylist: [/^\/api\//],
+        navigateFallbackDenylist: [/^\/api\//, /^\/sitemap\.xml/],
+        additionalManifestEntries: [],
+        importScripts: ['/sw-push.js'],
         runtimeCaching: [
           {
             urlPattern: /^https:\/\/votemap-production\.up\.railway\.app\/api\/.*/,
