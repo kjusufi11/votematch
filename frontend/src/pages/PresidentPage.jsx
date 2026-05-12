@@ -363,6 +363,7 @@ export default function PresidentPage() {
   const [search, setSearch]       = useState('');
   const [activeFilter, setActiveFilter] = useState(null);
   const [viewMode, setViewMode]   = useState('cards'); // 'cards' | 'timeline'
+  const [showEOs, setShowEOs]     = useState(false);
   const [userPriorities, setUserPriorities] = useState(null);
 
   useEffect(() => {
@@ -387,6 +388,10 @@ export default function PresidentPage() {
       setUserPriorities(domains);
     }).catch(() => {});
   }, [user]);
+
+  useEffect(() => {
+    if (activeFilter || search.trim() || viewMode === 'timeline') setShowEOs(true);
+  }, [activeFilter, search, viewMode]);
 
   const { president, stats, executiveOrders = [], enactedBills = [], vetoedBills = [], nominations = [], repVotes = [] } = data || {};
 
@@ -491,100 +496,117 @@ export default function PresidentPage() {
 
       {/* ── Executive orders ── */}
       <div style={{ marginBottom: '3rem' }}>
-        <SectionLabel>Executive orders · most recent {executiveOrders.length}</SectionLabel>
+        <SectionLabel>Executive orders ({executiveOrders.length})</SectionLabel>
 
-        {/* Search + view toggle */}
-        <div style={{ display: 'flex', gap: '.5rem', marginBottom: '.75rem', alignItems: 'center', flexWrap: 'wrap' }}>
-          <input
-            type="text"
-            placeholder="Search orders…"
-            value={search}
-            onChange={e => setSearch(e.target.value)}
+        {!showEOs ? (
+          <button
+            onClick={() => setShowEOs(true)}
             style={{
-              flex: '1 1 200px', minWidth: 0,
               fontSize: 12, fontFamily: 'var(--font-mono)',
-              padding: '6px 10px',
+              padding: '7px 16px', borderRadius: 'var(--radius)',
               border: '1px solid var(--border-med)',
-              borderRadius: 'var(--radius)',
-              background: 'var(--bg-2)',
-              color: 'var(--text)',
-              outline: 'none',
+              background: 'var(--bg-2)', color: 'var(--text-2)',
+              cursor: 'pointer',
             }}
-          />
-          <div style={{ display: 'flex', border: '1px solid var(--border-med)', borderRadius: 'var(--radius)', overflow: 'hidden', flexShrink: 0 }}>
-            {['cards', 'timeline'].map(mode => (
-              <button
-                key={mode}
-                onClick={() => setViewMode(mode)}
-                style={{
-                  fontSize: 11, fontFamily: 'var(--font-mono)',
-                  padding: '5px 12px',
-                  border: 'none',
-                  background: viewMode === mode ? 'var(--text)' : 'var(--bg-2)',
-                  color: viewMode === mode ? 'var(--bg-2)' : 'var(--text-2)',
-                  cursor: 'pointer',
-                  borderRight: mode === 'cards' ? '1px solid var(--border-med)' : 'none',
-                }}
-              >{mode}</button>
-            ))}
-          </div>
-        </div>
-
-        {/* Domain filter pills */}
-        {activeDomains.length > 0 && (
-          <div style={{ display: 'flex', gap: '.375rem', flexWrap: 'wrap', marginBottom: '.875rem' }}>
-            <button
-              onClick={() => setActiveFilter(null)}
-              style={{
-                fontSize: 11, fontFamily: 'var(--font-mono)',
-                padding: '4px 10px', borderRadius: 20,
-                border: '1px solid var(--border-med)',
-                background: !activeFilter ? 'var(--text)' : 'var(--bg-2)',
-                color: !activeFilter ? 'var(--bg-2)' : 'var(--text-2)',
-                cursor: 'pointer',
-              }}
-            >All</button>
-            {activeDomains.map(d => (
-              <button
-                key={d}
-                onClick={() => setActiveFilter(activeFilter === d ? null : d)}
-                style={{
-                  fontSize: 11, fontFamily: 'var(--font-mono)',
-                  padding: '4px 10px', borderRadius: 20,
-                  border: '1px solid var(--border-med)',
-                  background: activeFilter === d ? 'var(--text)' : 'var(--bg-2)',
-                  color: activeFilter === d ? 'var(--bg-2)' : 'var(--text-2)',
-                  cursor: 'pointer',
-                }}
-              >
-                {DOMAIN_LABELS[d] || d}{' '}
-                <span style={{ opacity: 0.6 }}>{domainCounts[d]}</span>
-              </button>
-            ))}
-          </div>
-        )}
-
-        {filteredOrders.length === 0 ? (
-          <p style={{ fontSize: 13, color: 'var(--text-3)', fontFamily: 'var(--font-mono)' }}>
-            No executive orders match.
-          </p>
-        ) : viewMode === 'timeline' ? (
-          <div style={{ paddingLeft: '.25rem' }}>
-            {filteredOrders.map((eo, i) => (
-              <EOCard key={eo.id} eo={eo} index={i} userPriorityDomains={userPriorityDomains} viewMode="timeline" />
-            ))}
-          </div>
+          >
+            Show all {executiveOrders.length} executive orders ↓
+          </button>
         ) : (
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '.75rem' }}>
-            {filteredOrders.map((eo, i) => (
-              <EOCard key={eo.id} eo={eo} index={i} userPriorityDomains={userPriorityDomains} viewMode="cards" />
-            ))}
-          </div>
-        )}
+          <>
+            {/* Search + view toggle */}
+            <div style={{ display: 'flex', gap: '.5rem', marginBottom: '.75rem', alignItems: 'center', flexWrap: 'wrap' }}>
+              <input
+                type="text"
+                placeholder="Search orders…"
+                value={search}
+                onChange={e => setSearch(e.target.value)}
+                style={{
+                  flex: '1 1 200px', minWidth: 0,
+                  fontSize: 12, fontFamily: 'var(--font-mono)',
+                  padding: '6px 10px',
+                  border: '1px solid var(--border-med)',
+                  borderRadius: 'var(--radius)',
+                  background: 'var(--bg-2)',
+                  color: 'var(--text)',
+                  outline: 'none',
+                }}
+              />
+              <div style={{ display: 'flex', border: '1px solid var(--border-med)', borderRadius: 'var(--radius)', overflow: 'hidden', flexShrink: 0 }}>
+                {['cards', 'timeline'].map(mode => (
+                  <button
+                    key={mode}
+                    onClick={() => setViewMode(mode)}
+                    style={{
+                      fontSize: 11, fontFamily: 'var(--font-mono)',
+                      padding: '5px 12px',
+                      border: 'none',
+                      background: viewMode === mode ? 'var(--text)' : 'var(--bg-2)',
+                      color: viewMode === mode ? 'var(--bg-2)' : 'var(--text-2)',
+                      cursor: 'pointer',
+                      borderRight: mode === 'cards' ? '1px solid var(--border-med)' : 'none',
+                    }}
+                  >{mode}</button>
+                ))}
+              </div>
+            </div>
 
-        <p style={{ marginTop: '1rem', fontSize: 11, color: 'var(--text-3)', fontFamily: 'var(--font-mono)' }}>
-          Source: Federal Register (federalregister.gov) · Summaries generated by AI
-        </p>
+            {/* Domain filter pills */}
+            {activeDomains.length > 0 && (
+              <div style={{ display: 'flex', gap: '.375rem', flexWrap: 'wrap', marginBottom: '.875rem' }}>
+                <button
+                  onClick={() => setActiveFilter(null)}
+                  style={{
+                    fontSize: 11, fontFamily: 'var(--font-mono)',
+                    padding: '4px 10px', borderRadius: 20,
+                    border: '1px solid var(--border-med)',
+                    background: !activeFilter ? 'var(--text)' : 'var(--bg-2)',
+                    color: !activeFilter ? 'var(--bg-2)' : 'var(--text-2)',
+                    cursor: 'pointer',
+                  }}
+                >All</button>
+                {activeDomains.map(d => (
+                  <button
+                    key={d}
+                    onClick={() => setActiveFilter(activeFilter === d ? null : d)}
+                    style={{
+                      fontSize: 11, fontFamily: 'var(--font-mono)',
+                      padding: '4px 10px', borderRadius: 20,
+                      border: '1px solid var(--border-med)',
+                      background: activeFilter === d ? 'var(--text)' : 'var(--bg-2)',
+                      color: activeFilter === d ? 'var(--bg-2)' : 'var(--text-2)',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    {DOMAIN_LABELS[d] || d}{' '}
+                    <span style={{ opacity: 0.6 }}>{domainCounts[d]}</span>
+                  </button>
+                ))}
+              </div>
+            )}
+
+            {filteredOrders.length === 0 ? (
+              <p style={{ fontSize: 13, color: 'var(--text-3)', fontFamily: 'var(--font-mono)' }}>
+                No executive orders match.
+              </p>
+            ) : viewMode === 'timeline' ? (
+              <div style={{ paddingLeft: '.25rem' }}>
+                {filteredOrders.map((eo, i) => (
+                  <EOCard key={eo.id} eo={eo} index={i} userPriorityDomains={userPriorityDomains} viewMode="timeline" />
+                ))}
+              </div>
+            ) : (
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '.75rem' }}>
+                {filteredOrders.map((eo, i) => (
+                  <EOCard key={eo.id} eo={eo} index={i} userPriorityDomains={userPriorityDomains} viewMode="cards" />
+                ))}
+              </div>
+            )}
+
+            <p style={{ marginTop: '1rem', fontSize: 11, color: 'var(--text-3)', fontFamily: 'var(--font-mono)' }}>
+              Source: Federal Register (federalregister.gov) · Summaries generated by AI
+            </p>
+          </>
+        )}
       </div>
 
       {/* ── Bills signed into law ── */}
