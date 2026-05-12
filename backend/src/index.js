@@ -66,6 +66,30 @@ app.use('/api/notifications', notificationsRoutes);
 app.use('/api/president', presidentRoutes);
 app.use('/api/bills', billsRoutes);
 
+// Sitemap — crawled by Google; lists all politician profile pages
+app.get('/sitemap.xml', async (req, res) => {
+  try {
+    const { rows } = await db.query('SELECT id FROM politicians ORDER BY last_name, first_name');
+    const base = 'https://votematch.app';
+    const staticUrls = ['/', '/president', '/upcoming', '/about', '/privacy', '/terms'].map(p =>
+      `<url><loc>${base}${p}</loc><changefreq>weekly</changefreq></url>`
+    );
+    const polUrls = rows.map(r =>
+      `<url><loc>${base}/politician/${r.id}</loc><changefreq>daily</changefreq></url>`
+    );
+    const xml = `<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+${[...staticUrls, ...polUrls].join('\n')}
+</urlset>`;
+    res.set('Content-Type', 'application/xml');
+    res.set('Cache-Control', 'public, max-age=86400');
+    res.send(xml);
+  } catch (err) {
+    console.error('[sitemap]', err.message);
+    res.status(500).send('<?xml version="1.0"?><urlset/>');
+  }
+});
+
 // Health check
 app.get('/health', (req, res) => {
   res.json({
