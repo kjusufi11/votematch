@@ -104,6 +104,11 @@ export default function MyReps() {
         </div>
       )}
 
+      {/* Social share — shown when alignment scores are loaded */}
+      {Object.values(alignment).some(s => s?.score != null) && (
+        <ShareMatchButton alignment={alignment} representatives={federal} />
+      )}
+
       <footer style={{ marginTop: '3rem', paddingTop: '1.5rem', borderTop: '1px solid var(--border)', display: 'flex', flexWrap: 'wrap', gap: 16, justifyContent: 'space-between' }}>
         <p style={{ fontSize: 11, color: 'var(--text-3)', fontFamily: 'var(--font-mono)' }}>Vote data: ProPublica · Reps: Google Civic · Analysis: Claude AI</p>
         <p style={{ fontSize: 11, color: 'var(--text-3)', fontFamily: 'var(--font-mono)' }}>Federal votes only · Updates nightly</p>
@@ -117,6 +122,59 @@ function SectionLabel({ children }) {
     <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '1rem' }}>
       <span style={{ fontSize: 10, fontFamily: 'var(--font-mono)', color: 'var(--text-3)', letterSpacing: '.12em', textTransform: 'uppercase', whiteSpace: 'nowrap' }}>{children}</span>
       <div style={{ flex: 1, height: 1, background: 'var(--border)' }} />
+    </div>
+  );
+}
+
+function ShareMatchButton({ alignment, representatives }) {
+  const scores = representatives
+    .filter(r => alignment[r.bioguideId]?.score != null)
+    .map(r => ({ name: r.name?.split(', ').reverse().join(' ') || r.name, score: alignment[r.bioguideId].score }))
+    .sort((a, b) => b.score - a.score);
+
+  if (!scores.length) return null;
+
+  const best = scores[0];
+  const worst = scores[scores.length - 1];
+
+  let tweetText;
+  if (scores.length === 1) {
+    tweetText = `I just found out ${best.name} is ${best.score}% aligned with my values on VoteMatch. How does your rep stack up?`;
+  } else {
+    tweetText = `My reps: ${best.name} is ${best.score}% aligned with my values, ${worst.name} is ${worst.score}%. See how yours vote → votematch.app`;
+  }
+
+  const tweetUrl = `https://twitter.com/intent/tweet?text=${encodeURIComponent(tweetText)}&url=${encodeURIComponent('https://votematch.app')}&via=votematch`;
+
+  return (
+    <div style={{
+      marginTop: '2rem', padding: '1.25rem 1.5rem',
+      background: 'var(--bg-2)', border: '1px solid var(--border-med)',
+      borderRadius: 'var(--radius-lg)', boxShadow: 'var(--shadow)',
+      display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '1rem', flexWrap: 'wrap',
+    }}>
+      <div>
+        <p style={{ margin: 0, fontSize: 14, fontWeight: 600, color: 'var(--text)' }}>Share your match scores</p>
+        <p style={{ margin: '3px 0 0', fontSize: 12, color: 'var(--text-3)', lineHeight: 1.5 }}>
+          Let people know how your representatives are voting
+        </p>
+      </div>
+      <a
+        href={tweetUrl}
+        target="_blank"
+        rel="noopener noreferrer"
+        style={{
+          height: 38, padding: '0 1.25rem', display: 'inline-flex', alignItems: 'center', gap: 8,
+          background: 'var(--text)', color: 'var(--bg-2)',
+          borderRadius: 'var(--radius)', fontSize: 13, fontWeight: 500,
+          textDecoration: 'none', whiteSpace: 'nowrap', flexShrink: 0,
+        }}
+      >
+        <svg width="15" height="13" viewBox="0 0 15 13" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
+          <path d="M14.2 0h-2.7L8.5 4.6 5.4 0H0l5.5 7.6L0 13h2.7l3.4-4.9L9.6 13H15l-5.7-7.7L14.2 0zm-3.7 12L1.8 1h2l8.7 11h-2z"/>
+        </svg>
+        Share on X
+      </a>
     </div>
   );
 }

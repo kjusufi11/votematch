@@ -149,6 +149,64 @@ export default function ZipLookup() {
         </div>
       </section>
 
+      {/* Mockup preview */}
+      <section style={{ padding: '2.5rem 1.5rem', borderTop: '1px solid var(--border)' }}>
+        <div style={{ maxWidth: 700, margin: '0 auto' }}>
+          <p style={{
+            fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-3)',
+            letterSpacing: '.12em', textTransform: 'uppercase', textAlign: 'center', marginBottom: '1.25rem',
+          }}>What you get after entering your ZIP</p>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '.625rem' }}>
+            {[
+              { name: 'Sen. Jane Doe', party: 'D', state: 'NY', score: 82, scoreColor: 'var(--green)', bars: [{ label: 'Healthcare', pct: 88 }, { label: 'Climate', pct: 91 }, { label: 'Education', pct: 76 }] },
+              { name: 'Rep. John Smith', party: 'R', state: 'NY', score: 34, scoreColor: 'var(--red)', bars: [{ label: 'Healthcare', pct: 22 }, { label: 'Climate', pct: 18 }, { label: 'Taxes', pct: 55 }] },
+            ].map((rep, idx) => (
+              <div key={idx} style={{
+                background: 'var(--bg-2)', border: '1px solid var(--border)',
+                borderRadius: 'var(--radius-lg)', padding: '1rem 1.25rem',
+                boxShadow: 'var(--shadow)', opacity: 0.85,
+                display: 'flex', alignItems: 'center', gap: '1.25rem', flexWrap: 'wrap',
+              }}>
+                <div style={{
+                  width: 40, height: 40, borderRadius: '50%', flexShrink: 0,
+                  background: rep.party === 'D' ? 'var(--party-d-dim)' : 'var(--party-r-dim)',
+                  border: `2px solid ${rep.party === 'D' ? 'var(--party-d)' : 'var(--party-r)'}`,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  fontSize: 14, fontWeight: 700, color: rep.party === 'D' ? 'var(--party-d)' : 'var(--party-r)',
+                }}>{rep.name.split(' ').slice(-1)[0][0]}</div>
+                <div style={{ flex: 1, minWidth: 120 }}>
+                  <p style={{ fontSize: 13, fontWeight: 600, margin: 0, color: 'var(--text)' }}>{rep.name}</p>
+                  <p style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-3)', margin: '2px 0 0' }}>
+                    {rep.party === 'D' ? 'Democrat' : 'Republican'} · {rep.state}
+                  </p>
+                </div>
+                <div style={{ flex: 2, minWidth: 140 }}>
+                  {rep.bars.map(b => (
+                    <div key={b.label} style={{ marginBottom: 5 }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 3 }}>
+                        <span style={{ fontSize: 10, fontFamily: 'var(--font-mono)', color: 'var(--text-3)' }}>{b.label}</span>
+                      </div>
+                      <div style={{ height: 4, background: 'var(--bg-3)', borderRadius: 2 }}>
+                        <div style={{ height: '100%', width: `${b.pct}%`, background: b.pct > 50 ? 'var(--blue)' : 'var(--red)', borderRadius: 2, transition: 'width 0.8s ease' }} />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                <div style={{ textAlign: 'center', flexShrink: 0 }}>
+                  <p style={{ fontFamily: 'var(--font-display)', fontSize: '1.5rem', fontWeight: 900, color: rep.scoreColor, margin: 0, letterSpacing: '-.02em' }}>
+                    {rep.score}%
+                  </p>
+                  <p style={{ fontSize: 10, fontFamily: 'var(--font-mono)', color: 'var(--text-3)', margin: '2px 0 0' }}>match</p>
+                </div>
+              </div>
+            ))}
+          </div>
+          <p style={{ textAlign: 'center', fontSize: 12, color: 'var(--text-3)', fontFamily: 'var(--font-mono)', marginTop: '.875rem' }}>
+            Sample preview — your actual results are based on your ZIP and your survey answers
+          </p>
+        </div>
+      </section>
+
       {/* Feature strip */}
       <section style={{
         borderTop: '1px solid var(--border)', background: 'var(--bg-2)', padding: '3rem 1.5rem',

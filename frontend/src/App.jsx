@@ -9,6 +9,7 @@ import Survey from './pages/Survey';
 import ExtendedSurvey from './pages/ExtendedSurvey';
 import PrivacyPage from './pages/PrivacyPage';
 import TermsPage from './pages/TermsPage';
+import AboutPage from './pages/AboutPage';
 import UpcomingPage from './pages/UpcomingPage';
 import PresidentPage from './pages/PresidentPage';
 import Nav from './components/Nav';
@@ -35,6 +36,7 @@ export default function App() {
           <Route path="/president" element={<PresidentPage />} />
           <Route path="/privacy" element={<PrivacyPage />} />
           <Route path="/terms" element={<TermsPage />} />
+          <Route path="/about" element={<AboutPage />} />
         </Routes>
         <Footer />
         <InstallBanner />
