@@ -52,6 +52,10 @@ function buildCongressUrl(ref) {
   return `https://www.congress.gov/bill/${congress}th-congress/${billType}/${number}`;
 }
 
+function buildCongressSearchUrl(query) {
+  return `https://www.congress.gov/search?q=${encodeURIComponent(JSON.stringify({ source: 'legislation', search: query }))}`;
+}
+
 function getRepPolIds() {
   try {
     const stored = sessionStorage.getItem('votemap_lookup');
@@ -417,10 +421,10 @@ function BillCard({ bill, last, expanded, onToggle, trackedKeys, onTrackChange, 
     if (!expanded || details !== null || !ref) return;
     setLoadingDetails(true);
     getBillDetails(ref.congress, ref.type, ref.number, repPolIds)
-      .then(setDetails)
+      .then(d => setDetails(d || {}))
       .catch(() => setDetails({}))
       .finally(() => setLoadingDetails(false));
-  }, [expanded, ref, details, repPolIds]);
+  }, [expanded, ref?.congress, ref?.type, ref?.number, details, repPolIds]);
 
   const handleTrack = async e => {
     e.stopPropagation();
@@ -492,6 +496,27 @@ function BillCard({ bill, last, expanded, onToggle, trackedKeys, onTrackChange, 
             <p style={{ fontSize: 12, color: 'var(--text-3)', fontFamily: 'var(--font-mono)', padding: '10px 0' }}>
               Loading details…
             </p>
+          ) : !ref ? (
+            /* No Congress.gov reference — show what we have from DB */
+            <div style={{ paddingTop: '.75rem' }}>
+              {bill.title && bill.title !== (bill.short_title || '') && (
+                <p style={{ fontSize: 13, color: 'var(--text-2)', lineHeight: 1.6, marginBottom: '.75rem' }}>
+                  {bill.title}
+                </p>
+              )}
+              {bill.summary && (
+                <p style={{ fontSize: 13, color: 'var(--text-2)', lineHeight: 1.6, marginBottom: '.75rem' }}>
+                  {bill.summary}
+                </p>
+              )}
+              <a
+                href={buildCongressSearchUrl(bill.short_title || bill.title)}
+                target="_blank"
+                rel="noopener noreferrer"
+                style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-2)', textDecoration: 'none',
+                  padding: '5px 12px', border: '1px solid var(--border-med)', borderRadius: 'var(--radius)', background: 'var(--bg-2)', display: 'inline-block' }}
+              >Search on Congress.gov →</a>
+            </div>
           ) : (
             <>
               {/* Summary */}
