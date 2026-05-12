@@ -81,6 +81,22 @@ app.use((err, req, res, next) => {
   res.status(500).json({ error: 'Internal server error.' });
 });
 
+// Idempotent table creation for extended survey
+const db = require('./db');
+db.query(`
+  CREATE TABLE IF NOT EXISTS extended_survey_responses (
+    user_id TEXT PRIMARY KEY,
+    demographics JSONB DEFAULT '{}',
+    engagement JSONB DEFAULT '{}',
+    deal_breakers JSONB DEFAULT '{}',
+    policy_depth JSONB DEFAULT '{}',
+    research_consent BOOLEAN DEFAULT false,
+    completed_at TIMESTAMPTZ,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW()
+  )
+`).catch(e => console.warn('[startup] extended_survey_responses table:', e.message));
+
 app.listen(PORT, () => {
   console.log(`\nVoteMatch API running on http://localhost:${PORT}`);
   const missing = ['CONGRESS_API_KEY', 'GOOGLE_CIVIC_API_KEY', 'ANTHROPIC_API_KEY']

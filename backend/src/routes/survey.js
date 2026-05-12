@@ -41,8 +41,6 @@ router.post('/:userId', async (req, res) => {
   }
 });
 
-module.exports = router;
-
 // GET /api/survey/:userId/alignment?politicians=id1,id2,id3
 router.get('/:userId/alignment', async (req, res) => {
   const { userId } = req.params;
@@ -60,3 +58,47 @@ router.get('/:userId/alignment', async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 });
+
+// GET /api/survey/extended/:userId
+router.get('/extended/:userId', async (req, res) => {
+  const { userId } = req.params;
+  try {
+    const result = await db.query(
+      'SELECT demographics, engagement, deal_breakers, policy_depth, research_consent, completed_at FROM extended_survey_responses WHERE user_id = $1',
+      [userId]
+    );
+    if (!result.rows.length) return res.status(404).json({ error: 'No extended survey found.' });
+    res.json(result.rows[0]);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// POST /api/survey/extended/:userId
+router.post('/extended/:userId', async (req, res) => {
+  const { userId } = req.params;
+  const { demographics, engagement, deal_breakers, policy_depth, research_consent, completed } = req.body;
+  try {
+    await db.query(`
+      INSERT INTO extended_survey_responses
+        (user_id, demographics, engagement, deal_breakers, policy_depth, research_consent, completed_at, updated_at)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, NOW())
+      ON CONFLICT (user_id) DO UPDATE SET
+        demographics = $2, engagement = $3, deal_breakers = $4, policy_depth = $5,
+        research_consent = $6, completed_at = $7, updated_at = NOW()
+    `, [
+      userId,
+      JSON.stringify(demographics || {}),
+      JSON.stringify(engagement || {}),
+      JSON.stringify(deal_breakers || {}),
+      JSON.stringify(policy_depth || {}),
+      research_consent ?? false,
+      completed ? new Date() : null,
+    ]);
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+module.exports = router;

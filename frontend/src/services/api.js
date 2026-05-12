@@ -174,6 +174,21 @@ export async function updateNotificationPrefs(prefs) {
   return data;
 }
 
+export async function getExtendedSurvey(userId) {
+  try {
+    const { data } = await api.get(`/survey/extended/${userId}`);
+    return data;
+  } catch (err) {
+    if (err?.response?.status === 404) return null;
+    throw err;
+  }
+}
+
+export async function saveExtendedSurvey(userId, surveyData) {
+  const { data } = await api.post(`/survey/extended/${userId}`, surveyData);
+  return data;
+}
+
 export async function getAlignmentForPolitician(politicianId, userId) {
   const base = (import.meta.env.VITE_API_URL || 'https://votemap-production.up.railway.app/api').replace(/\/api$/, '');
   const token = localStorage.getItem('votemap_token');

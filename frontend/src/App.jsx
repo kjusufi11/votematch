@@ -6,6 +6,7 @@ import ZipLookup from './pages/ZipLookup';
 import MyReps from './pages/MyReps';
 import PoliticianProfile from './pages/PoliticianProfile';
 import Survey from './pages/Survey';
+import ExtendedSurvey from './pages/ExtendedSurvey';
 import UpcomingPage from './pages/UpcomingPage';
 import PresidentPage from './pages/PresidentPage';
 import Nav from './components/Nav';
@@ -25,6 +26,7 @@ export default function App() {
           <Route path="/reps" element={<MyReps />} />
           <Route path="/politician/:id" element={<PoliticianProfile />} />
           <Route path="/survey" element={<ProtectedRoute><Survey /></ProtectedRoute>} />
+          <Route path="/survey/extended" element={<ProtectedRoute><ExtendedSurvey /></ProtectedRoute>} />
           <Route path="/upcoming" element={<UpcomingPage />} />
           <Route path="/president" element={<PresidentPage />} />
         </Routes>

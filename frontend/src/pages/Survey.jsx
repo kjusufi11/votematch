@@ -1,7 +1,7 @@
 import { useAuth } from '../contexts/AuthContext';
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { saveSurvey, getSurvey, getNotificationPrefs, updateNotificationPrefs } from '../services/api';
+import { useNavigate, Link } from 'react-router-dom';
+import { saveSurvey, getSurvey, getNotificationPrefs, updateNotificationPrefs, getExtendedSurvey } from '../services/api';
 
 const ISSUES = [
   {
@@ -133,6 +133,7 @@ export default function Survey() {
   const [saved, setSaved]             = useState(false);
   const [alertsEnabled, setAlertsEnabled] = useState(null);
   const [alertsToggling, setAlertsToggling] = useState(false);
+  const [extendedDone, setExtendedDone] = useState(false);
 
   const totalSteps  = ISSUES.length;
   const currentIssue = ISSUES[step - 1];
@@ -153,6 +154,10 @@ export default function Survey() {
       try {
         const prefs = await getNotificationPrefs();
         setAlertsEnabled(prefs.vote_alerts ?? true);
+      } catch {}
+      try {
+        const ext = await getExtendedSurvey(user.id);
+        if (ext?.completed_at) setExtendedDone(true);
       } catch {}
       setLoading(false);
     }
@@ -265,6 +270,45 @@ export default function Survey() {
             }}>Update my answers</button>
           </div>
         </div>
+
+        {/* Extended survey CTA */}
+        {!extendedDone && (
+          <div style={{
+            padding: '1.25rem 1.5rem', marginBottom: '1.5rem',
+            background: 'var(--bg-2)', border: '1px solid var(--border-med)',
+            borderRadius: 'var(--radius-lg)', boxShadow: 'var(--shadow)',
+            display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '1rem', flexWrap: 'wrap',
+          }}>
+            <div>
+              <p style={{ margin: 0, fontSize: 14, fontWeight: 600, color: 'var(--text)' }}>
+                Get a more accurate match score
+              </p>
+              <p style={{ margin: '3px 0 0', fontSize: 12, color: 'var(--text-3)', lineHeight: 1.5 }}>
+                Take the full survey (~5 min) — deal breakers, policy depth, and more
+              </p>
+            </div>
+            <Link to="/survey/extended" style={{
+              height: 36, padding: '0 1.25rem', display: 'inline-flex', alignItems: 'center',
+              background: 'var(--text)', color: 'var(--bg-2)',
+              borderRadius: 'var(--radius)', fontSize: 13, fontWeight: 500,
+              textDecoration: 'none', whiteSpace: 'nowrap', flexShrink: 0,
+            }}>
+              Full survey →
+            </Link>
+          </div>
+        )}
+
+        {extendedDone && (
+          <div style={{
+            padding: '0.75rem 1.25rem', marginBottom: '1.5rem',
+            background: 'var(--green-dim)', border: '1px solid var(--green)',
+            borderRadius: 'var(--radius-lg)', display: 'flex', alignItems: 'center', gap: 8,
+          }}>
+            <span style={{ fontSize: 13, color: 'var(--green)', fontFamily: 'var(--font-mono)' }}>◎</span>
+            <span style={{ fontSize: 13, color: 'var(--green)' }}>Full survey complete — your match scores are fully calibrated.</span>
+            <Link to="/survey/extended" style={{ marginLeft: 'auto', fontSize: 12, color: 'var(--green)', textDecoration: 'underline', whiteSpace: 'nowrap' }}>Update</Link>
+          </div>
+        )}
 
         {/* Email alerts toggle */}
         {alertsEnabled !== null && (

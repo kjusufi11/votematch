@@ -3,6 +3,16 @@
 
 const db = require('../db');
 
+// Maps extended survey policy_depth answers → (issueId, conservativeScore 0–1)
+// Used to blend a more precise position signal into the base alignment score.
+const DEPTH_MAP = {
+  healthcare: { issue: 'healthcare', scores: { single_payer: 0, hybrid: 0.375, private: 0.875 } },
+  trade:      { issue: 'taxes',      scores: { free_trade: 0.25, case_by_case: 0.5, protectionist: 0.75 } },
+  immigration: { issue: 'immigration', scores: { path_citizenship: 0, guest_worker: 0.5, deportation: 1 } },
+  defense:    { issue: 'defense',    scores: { reduce: 0, maintain: 0.5, increase: 1 } },
+  tax:        { issue: 'taxes',      scores: { wealth_tax: 0, progressive: 0.25, flat: 0.875 } },
+};
+
 // Maps issue IDs from the survey to vote categories/keywords in our DB
 const ISSUE_VOTE_MAPPING = {
   healthcare: {
@@ -92,6 +102,25 @@ async function calculateAlignment(userId, politicianId) {
 
   if (answeredIssues.length === 0) return null;
 
+  // Load extended survey policy depth (best-effort — non-fatal if missing)
+  let policyDepth = {};
+  try {
+    const extResult = await db.query(
+      'SELECT policy_depth FROM extended_survey_responses WHERE user_id = $1',
+      [String(userId)]
+    );
+    if (extResult.rows.length) policyDepth = extResult.rows[0].policy_depth || {};
+  } catch {}
+
+  // Build a depth override map: issueId → precise conservativeScore (0–1)
+  const depthOverrides = {};
+  for (const [depthKey, cfg] of Object.entries(DEPTH_MAP)) {
+    const answer = policyDepth[depthKey];
+    if (answer && cfg.scores[answer] !== undefined) {
+      depthOverrides[cfg.issue] = cfg.scores[answer];
+    }
+  }
+
   // 2. For each answered issue, get politician's relevant votes
   let totalWeight = 0;
   let weightedAgreement = 0;
@@ -129,14 +158,21 @@ async function calculateAlignment(userId, politicianId) {
     if (politicianScore === null) continue;
 
     // User's position (0=progressive, 1=conservative)
-    const userScore = userPositionToScore(userValue);
+    // If policy depth gave us a precise override for this issue, blend it in (weighted 2:1 over basic answer)
+    const baseUserScore = userPositionToScore(userValue);
+    const depthScore = depthOverrides[issueId];
+    const userScore = depthScore !== undefined
+      ? (baseUserScore + depthScore * 2) / 3
+      : baseUserScore;
 
     // Agreement = 1 - |difference| (1 = perfect agreement, 0 = complete disagreement)
     const agreement = 1 - Math.abs(userScore - politicianScore);
 
-    // Weight by importance
-    totalWeight += importanceWeight;
-    weightedAgreement += agreement * importanceWeight;
+    // Boost importance weight for issues where user provided depth detail
+    const effectiveWeight = depthScore !== undefined ? Math.min(importanceWeight + 1, 3) : importanceWeight;
+
+    totalWeight += effectiveWeight;
+    weightedAgreement += agreement * effectiveWeight;
 
     breakdown.push({
       issue: issueId,
