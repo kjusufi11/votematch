@@ -43,4 +43,16 @@ export function signOut() {
   window.location.href = '/';
 }
 
+export async function saveZip(zip) {
+  await api.put('/auth/zip', { zip });
+  const stored = getUser();
+  if (stored) localStorage.setItem(USER_KEY, JSON.stringify({ ...stored, zip_code: zip }));
+}
+
+export async function fetchMe() {
+  const { data } = await api.get('/auth/me');
+  localStorage.setItem(USER_KEY, JSON.stringify(data));
+  return data;
+}
+
 export default api;

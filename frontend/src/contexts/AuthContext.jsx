@@ -1,5 +1,5 @@
-import React, { createContext, useContext, useState } from 'react';
-import { getUser, signIn, signUp, signOut } from '../services/auth';
+import React, { createContext, useContext, useState, useEffect } from 'react';
+import { getUser, signIn, signUp, signOut, fetchMe } from '../services/auth';
 
 const AuthContext = createContext(null);
 
@@ -7,6 +7,12 @@ export function AuthProvider({ children }) {
   const [user, setUser]       = useState(getUser());
   const [loading, setLoading] = useState(false);
   const [error, setError]     = useState('');
+
+  // On mount, refresh user profile from server so zip_code is always current
+  useEffect(() => {
+    if (!user) return;
+    fetchMe().then(setUser).catch(() => {});
+  }, []);
 
   async function login(email, password) {
     setLoading(true); setError('');
@@ -33,7 +39,7 @@ export function AuthProvider({ children }) {
   function logout() { setUser(null); signOut(); }
 
   return (
-    <AuthContext.Provider value={{ user, loading, error, login, register, logout, isLoggedIn: !!user }}>
+    <AuthContext.Provider value={{ user, setUser, loading, error, login, register, logout, isLoggedIn: !!user }}>
       {children}
     </AuthContext.Provider>
   );

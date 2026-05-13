@@ -12,8 +12,17 @@ export default function MyReps() {
   const [surveyImportance, setSurveyImportance] = useState(undefined);
 
   useEffect(() => {
-    const stored = sessionStorage.getItem('votemap_lookup');
-    if (stored) { try { setData(JSON.parse(stored)); return; } catch {} }
+    const raw = sessionStorage.getItem('votemap_lookup') || localStorage.getItem('votemap_lookup');
+    if (raw) {
+      try {
+        const parsed = JSON.parse(raw);
+        if (parsed?.zip) {
+          sessionStorage.setItem('votemap_lookup', raw); // warm sessionStorage for other pages
+          setData(parsed);
+          return;
+        }
+      } catch {}
+    }
     navigate('/');
   }, []);
 
@@ -51,6 +60,19 @@ export default function MyReps() {
             <span style={{ color: 'var(--border-med)', fontSize: 11 }}>·</span>
             <span style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-3)' }}>{city}, {state}</span>
           </>}
+          <button
+            onClick={() => {
+              sessionStorage.removeItem('votemap_lookup');
+              navigate('/');
+            }}
+            style={{
+              fontSize: 10, fontFamily: 'var(--font-mono)', color: 'var(--text-3)',
+              background: 'none', border: '1px solid var(--border)', borderRadius: 3,
+              padding: '2px 7px', cursor: 'pointer', letterSpacing: '.05em',
+            }}
+          >
+            Change ZIP
+          </button>
         </div>
         <h1 style={{
           fontFamily: 'var(--font-display)', fontSize: 'clamp(1.9rem, 4vw, 2.9rem)',

@@ -1,6 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { lookupZip, getErrorMessage } from '../services/api';
+import { useAuth } from '../contexts/AuthContext';
+import { saveZip } from '../services/auth';
 
 const EXAMPLES = ['10001', '90210', '60601', '77001', '02101'];
 
@@ -11,6 +13,52 @@ export default function ZipLookup() {
   const navigate              = useNavigate();
   const [params]              = useSearchParams();
   const unsubscribed          = params.get('unsubscribed') === '1';
+  const { user, setUser, isLoggedIn } = useAuth();
+  const didAutoRedirect = useRef(false);
+
+  // Auto-redirect if we already have a saved ZIP
+  useEffect(() => {
+    if (didAutoRedirect.current) return;
+
+    // Logged-in user with a server-saved ZIP
+    if (isLoggedIn && user?.zip_code) {
+      didAutoRedirect.current = true;
+      performLookup(user.zip_code);
+      return;
+    }
+
+    // Guest user: restore last lookup from localStorage
+    if (!isLoggedIn) {
+      const cached = localStorage.getItem('votemap_lookup');
+      if (cached) {
+        try {
+          const parsed = JSON.parse(cached);
+          if (parsed?.zip && parsed?.representatives?.length) {
+            didAutoRedirect.current = true;
+            sessionStorage.setItem('votemap_lookup', cached);
+            navigate('/reps');
+            return;
+          }
+        } catch {}
+      }
+    }
+  }, [user, isLoggedIn]);
+
+  async function performLookup(zipCode) {
+    setLoading(true);
+    try {
+      const data = await lookupZip(zipCode);
+      const payload = JSON.stringify({ zip: zipCode, ...data });
+      sessionStorage.setItem('votemap_lookup', payload);
+      localStorage.setItem('votemap_lookup', payload);
+      navigate('/reps');
+    } catch {
+      // Auto-lookup failed — just show the form so they can try again
+      didAutoRedirect.current = false;
+    } finally {
+      setLoading(false);
+    }
+  }
 
   async function handleSubmit(e) {
     e.preventDefault();
@@ -22,10 +70,32 @@ export default function ZipLookup() {
       const payload = JSON.stringify({ zip: clean, ...data });
       sessionStorage.setItem('votemap_lookup', payload);
       localStorage.setItem('votemap_lookup', payload);
+
+      // Persist ZIP for logged-in users
+      if (isLoggedIn) {
+        saveZip(clean)
+          .then(() => setUser(u => u ? { ...u, zip_code: clean } : u))
+          .catch(() => {});
+      }
+
       navigate('/reps');
     } catch (err) {
       setError(getErrorMessage(err));
     } finally { setLoading(false); }
+  }
+
+  // Show a minimal loading state while auto-redirecting
+  if (loading && didAutoRedirect.current) {
+    return (
+      <div style={{ minHeight: 'calc(100vh - 54px)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <div style={{ textAlign: 'center' }}>
+          <div style={{ width: 8, height: 8, borderRadius: '50%', background: 'var(--text-3)', margin: '0 auto 1.5rem', animation: 'pulse 1.2s ease infinite' }} />
+          <p style={{ fontSize: 14, color: 'var(--text-3)', fontFamily: 'var(--font-mono)' }}>
+            Loading your representatives…
+          </p>
+        </div>
+      </div>
+    );
   }
 
   return (
@@ -47,7 +117,6 @@ export default function ZipLookup() {
         padding: '5rem 1.5rem 3rem', position: 'relative', overflow: 'hidden',
         background: 'linear-gradient(160deg, #fff 0%, var(--bg) 60%)',
       }}>
-        {/* Subtle horizontal lines */}
         <div style={{
           position: 'absolute', inset: 0, pointerEvents: 'none',
           backgroundImage: 'linear-gradient(var(--border) 1px, transparent 1px)',

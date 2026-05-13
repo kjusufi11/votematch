@@ -47,6 +47,15 @@ function verifyPassword(password, stored) {
   return attempt === hash;
 }
 
+// Verify Bearer token from Authorization header; returns payload or responds 401
+function requireAuth(req, res) {
+  const auth = req.headers.authorization;
+  if (!auth?.startsWith('Bearer ')) { res.status(401).json({ error: 'Unauthorized' }); return null; }
+  const payload = verifyToken(auth.slice(7));
+  if (!payload) { res.status(401).json({ error: 'Invalid or expired token' }); return null; }
+  return payload;
+}
+
 // POST /api/auth/signup
 router.post('/signup', async (req, res) => {
   const { email, password } = req.body;
@@ -59,13 +68,13 @@ router.post('/signup', async (req, res) => {
 
     const hash = hashPassword(password);
     const result = await db.query(
-      'INSERT INTO users (email, password_hash) VALUES ($1, $2) RETURNING id, email',
+      'INSERT INTO users (email, password_hash) VALUES ($1, $2) RETURNING id, email, zip_code',
       [email.toLowerCase(), hash]
     );
     const user = result.rows[0];
     await createDefaultNotificationPrefs(user.id);
     const token = createToken({ userId: user.id, email: user.email });
-    res.json({ token, user: { id: String(user.id), email: user.email } });
+    res.json({ token, user: { id: String(user.id), email: user.email, zip_code: user.zip_code || null } });
   } catch (err) {
     console.error('Signup error:', err.message);
     res.status(500).json({ error: 'Signup failed. Please try again.' });
@@ -78,17 +87,48 @@ router.post('/signin', async (req, res) => {
   if (!email || !password) return res.status(400).json({ error: 'Email and password required.' });
 
   try {
-    const result = await db.query('SELECT id, email, password_hash FROM users WHERE email = $1', [email.toLowerCase()]);
+    const result = await db.query(
+      'SELECT id, email, password_hash, zip_code FROM users WHERE email = $1',
+      [email.toLowerCase()]
+    );
     if (!result.rows.length) return res.status(401).json({ error: 'Invalid email or password.' });
 
     const user = result.rows[0];
     if (!verifyPassword(password, user.password_hash)) return res.status(401).json({ error: 'Invalid email or password.' });
 
     const token = createToken({ userId: user.id, email: user.email });
-    res.json({ token, user: { id: String(user.id), email: user.email } });
+    res.json({ token, user: { id: String(user.id), email: user.email, zip_code: user.zip_code || null } });
   } catch (err) {
     console.error('Signin error:', err.message);
     res.status(500).json({ error: 'Sign in failed. Please try again.' });
+  }
+});
+
+// GET /api/auth/me — returns full user profile including saved ZIP
+router.get('/me', async (req, res) => {
+  const payload = requireAuth(req, res);
+  if (!payload) return;
+  try {
+    const result = await db.query('SELECT id, email, zip_code FROM users WHERE id = $1', [payload.userId]);
+    if (!result.rows.length) return res.status(404).json({ error: 'User not found' });
+    const u = result.rows[0];
+    res.json({ id: String(u.id), email: u.email, zip_code: u.zip_code || null });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// PUT /api/auth/zip — save or update the user's home ZIP
+router.put('/zip', async (req, res) => {
+  const payload = requireAuth(req, res);
+  if (!payload) return;
+  const { zip } = req.body;
+  if (!zip || !/^\d{5}$/.test(zip)) return res.status(400).json({ error: 'Invalid ZIP code' });
+  try {
+    await db.query('UPDATE users SET zip_code = $1 WHERE id = $2', [zip, payload.userId]);
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
   }
 });
 

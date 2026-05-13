@@ -108,6 +108,9 @@ app.use((err, req, res, next) => {
 
 // Idempotent table creation
 const db = require('./db');
+db.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS zip_code TEXT')
+  .catch(e => console.warn('[startup] zip_code column:', e.message));
+
 db.query(`
   CREATE TABLE IF NOT EXISTS push_subscriptions (
     id SERIAL PRIMARY KEY,
